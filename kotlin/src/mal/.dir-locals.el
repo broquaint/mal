@@ -1,3 +1,3 @@
 ((nil . ((indent-tabs-mode . nil)
-         (tab-width . 4)
+         (kotlin-tab-width . 4)
          )))
