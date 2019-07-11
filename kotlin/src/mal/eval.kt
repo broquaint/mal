@@ -1,5 +1,3 @@
-fun READ(s: String) = read_str(s)
-
 val repl_env : Map<String, MalFunc> = mapOf(
         "+" to MalFunc({ a, b -> MalNumber((a as MalNumber).num + (b as MalNumber).num) }),
         "-" to MalFunc({ a, b -> MalNumber((a as MalNumber).num - (b as MalNumber).num) }),
@@ -16,8 +14,7 @@ val repl_env : Map<String, MalFunc> = mapOf(
 //  * otherwise just return the original ast value
 
 fun eval_ast(ast: MalType, env: Map<String, MalFunc>, depth: Int) : MalType {
-//    print("eval_ast: ".repeat(depth))
-//    println(PRINT(ast))
+//    println("eval_ast: ".repeat(depth) + pr_str(ast))
     return when(ast) {
         is MalList   -> MalList(ast.atoms.map { EVAL(it, env, depth) }.toList())
         is MalSymbol -> env[ast.sym] ?: throw Exception("Unknown symbol '${ast.sym}'")
@@ -34,8 +31,7 @@ fun eval_ast(ast: MalType, env: Map<String, MalFunc>, depth: Int) : MalType {
 
 var eval_count = 0
 fun EVAL(ast: MalType, env: Map<String, MalFunc>, depth: Int) : MalType {
-//    print("EVAL____: ".repeat(depth))
-//    println(PRINT(ast))
+    println("  EVAL: ".repeat(depth) + pr_str(ast))
 
     eval_count += 1
     if (depth > 200 || eval_count > 500) {
@@ -50,30 +46,12 @@ fun EVAL(ast: MalType, env: Map<String, MalFunc>, depth: Int) : MalType {
             return ast
         }
         else {
+            println("calling "+ast.head()+" with "+ast.tail())
             val l = eval_ast(ast, env, depth + 1)
             val f = ((l as MalList).head() as MalFunc)
-            return f(l.tail())
+            val r = f(l.tail())
+            println("result: ".repeat(depth) + pr_str(r))
+            return r
         }
     }
 }
-
-fun PRINT(v: MalType) = pr_str(v)
-
-fun rep(s: String) {
-    println(PRINT(EVAL(READ(s), repl_env, 0)))
-}
-
-fun main(args: Array<String>) {
-    while(true) {
-        print("user> ")
-
-        try {
-            readLine()?.let { rep(it) }
-        }
-        catch(e: Exception) {
-            println("Oh dear:" + e.toString())
-        }
-    }
-}
-
-

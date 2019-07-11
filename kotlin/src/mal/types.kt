@@ -8,10 +8,18 @@
 
 interface MalType {}
 
-data class MalList(val atoms : List<MalType>) : MalType
+data class MalList(val atoms : List<MalType>) : MalType {
+    fun head() = atoms[0]
+    fun tail() = atoms.slice(1 .. atoms.size - 1)
+}
 
 interface MalAtom : MalType {}
 
-data class MalNumber(val number : Number) : MalAtom
+data class MalNumber(val num : Int) : MalAtom
 
 data class MalSymbol(val sym : String) : MalAtom
+
+class MalFunc(val func : (MalType, MalType) -> MalType) : MalType {
+    operator fun invoke(args: List<MalType>) : MalType =
+        args.reduce { acc: MalType, v: MalType -> func(acc, v) }
+}

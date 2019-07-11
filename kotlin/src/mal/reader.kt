@@ -42,50 +42,16 @@ class Reader(val tokens: List<String>) {
     // returns the token at the current position and increments the position
     fun next() : String {
         val s = tokens[pos]
-        pos += 1
+        pos++
         return s
     }
 
+    // Check whether we're at the end.
+    fun isLast() = pos == (tokens.size - 1)
     // just returns the token at the current position.
     fun peek() = tokens[pos]
 }
 
-var readLimit = 0
-
-// This function will peek at the first token in the Reader object and
-// switch on the first character of that token. If the character is a
-// left paren then read_list is called with the Reader
-// object. Otherwise, read_atom is called with the Reader Object. The
-// return value from read_form is a mal data type.
-fun read_form(r: Reader) : MalType {
-    try {
-        return when(r.peek()) {
-            "("  -> read_list(r)
-            else -> read_atom(r)
-        }
-    }
-    catch(e: IndexOutOfBoundsException) {
-        throw Exception("Ran out of tokens, missing right paren?")
-    }
-    finally {
-        readLimit = 0
-    }
-}
-
-fun read_list(r: Reader) : MalList {
-//    println("Reading list: " + r)
-    r.next() // Move past the opening paren.
-    val list : MutableList<MalType> = mutableListOf()
-    while(r.peek() != ")") {
-        list.add(read_form(r))
-        // Safety limit to prevent the REPL never coming back.
-        readLimit += 1
-        if (readLimit > 200) {
-            throw Exception("Parser found no end :(")
-        }
-    }
-    return MalList(list)
-}
 
 fun is_number(s: String) = Regex("\\d+").matches(s)
 
@@ -102,7 +68,58 @@ fun read_atom(r: Reader) : MalAtom {
     }
 }
 
+var readLimit = 0
+
+fun check_limit() {
+    readLimit++
+    if (readLimit > 200) {
+        throw Exception("Parser found no end :/")
+    }
+}
+
+fun read_form(r: Reader, n: Int) : MalType {
+//    println("v8> " + " ".repeat(n) + "read_form")
+    try {
+        return when(r.peek()) {
+            "("  -> read_list(r, n + 1) // )
+            else -> read_atom(r)
+        }
+    }
+    catch(e: IndexOutOfBoundsException) {
+        throw Exception("Ran out of tokens, missing right paren?")
+    }
+}
+
+fun read_list(r: Reader, n: Int) : MalList {
+    r.next() // Move past the opening paren.
+//    val say = { m: String -> println("v8> " + " ".repeat(n) + m) }
+    val list : MutableList<MalType> = mutableListOf()
+    while(r.peek() != ")") { // balance parens x_x
+//        say("at char: " + r.peek())
+        list.add(read_form(r, n))
+        check_limit()
+        // Safety limit to prevent the REPL never coming back.
+    }
+    if(!r.isLast()) r.next()
+//    say("returning list!")
+    return MalList(list)
+}
+
+// This function will peek at the first token in the Reader object and
+// switch on the first character of that token. If the character is a
+// left paren then read_list is called with the Reader
+// object. Otherwise, read_atom is called with the Reader Object. The
+// return value from read_form is a mal data type.
+fun read_form_safely(r: Reader) : MalType {
+    try {
+        return read_form(r, 0);
+    }
+    finally {
+        readLimit = 0
+    }
+}
+
 // This function will call tokenize and then create a new Reader
 // object instance with the tokens. Then it will call read_form with
 // the Reader instance.
-fun read_str(s: String) = read_form(Reader(tokenize(s)))
+fun read_str(s: String) = read_form_safely(Reader(tokenize(s)))
