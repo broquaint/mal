@@ -100,7 +100,7 @@ fun EVAL(ast: MalType, env: Env, depth: Int) : MalType {
 
 fun PRINT(v: MalType) = pr_str(v)
 
-val repl_env = Env(null).apply {
+val repl_env = Env().apply {
     set(MalSymbol("+"), MalFunc({ a, b -> MalNumber((a as MalNumber).num + (b as MalNumber).num) }))
     set(MalSymbol("-"), MalFunc({ a, b -> MalNumber((a as MalNumber).num - (b as MalNumber).num) }))
     set(MalSymbol("*"), MalFunc({ a, b -> MalNumber((a as MalNumber).num * (b as MalNumber).num) }))

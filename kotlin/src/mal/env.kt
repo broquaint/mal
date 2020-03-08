@@ -1,6 +1,15 @@
 // Define an Env object that is instantiated with a single outer parameter and starts with an empty associative data structure property data.
-class Env(val outer: Env?) {
+class Env(val outer: Env? = null,
+          val binds : MalList = emptyMalList(),
+          val exprs : MalList = emptyMalList()) {
+
     val data : MutableMap<MalSymbol, MalType> = mutableMapOf()
+
+    init {
+        for(idx in binds.atoms.indices) {
+            set(binds.atoms[idx] as MalSymbol, exprs.atoms[idx])
+        }
+    }
 
     // Define three methods for the Env object:
     // set: takes a symbol key and a mal value and adds to the data structure

@@ -8,18 +8,36 @@
 
 interface MalType {}
 
-data class MalList(val atoms : List<MalType>) : MalType {
-    fun head() = atoms[0]
-    fun tail() = atoms.slice(1 .. atoms.size - 1)
-}
-
 interface MalAtom : MalType {}
 
 data class MalNumber(val num : Int) : MalAtom
 
+data class MalString(val str : String) : MalAtom
+
 data class MalSymbol(val sym : String) : MalAtom
 
-class MalFunc(val func : (MalType, MalType) -> MalType) : MalType {
-    operator fun invoke(args: List<MalType>) : MalType =
-        args.reduce { acc: MalType, v: MalType -> func(acc, v) }
+data class MalBoolean(val bool : Boolean) : MalAtom
+
+class MalNil() : MalAtom
+
+open class MalList(val atoms : List<MalType>) : MalType {
+    fun head() = atoms[0]
+    fun tail() = MalList(atoms.slice(1 .. atoms.size - 1))
+    fun last() = atoms.last()
+    operator fun get(index: Int): MalType = atoms[index]
+    // TODO Maybe implement complementN too.
 }
+
+class MalVector(atoms : List<MalType>) : MalList(atoms)
+
+class MalFunc(val func : (MalList) -> MalType, val name : String = "anon") : MalType {
+    operator fun invoke(args: MalList) : MalType {
+        return func(args)
+    }
+}
+
+// Helper functions.
+fun emptyMalList() = MalList(listOf())
+fun malListOf(vararg elems: MalType) = MalList(elems.asList())
+fun malSym(sym: String) = MalSymbol(sym)
+fun malFun(name: String, f: (MalList) -> MalType) = MalFunc(f, name)

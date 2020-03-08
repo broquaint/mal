@@ -1,5 +1,7 @@
 // For each match captured within the parenthesis starting at char 6
 // of the regular expression a new token will be created.
+
+// TODO Support escaped double quotes e.g "foo \"bar\" baz" -> """foo "bar" baz"""
 var tokenizer = Regex("""
 # Matches any number of whitespaces or commas
 [\s,]*
@@ -12,7 +14,7 @@ var tokenizer = Regex("""
   # it was preceded by a backslash in which case it includes it until the next
   # double-quote (tokenized). It will also match unbalanced strings (no ending
   # double-quote) which should be reported as an error.
-  "(?:.|[^"])*"? |
+  "(?:.|[^"])*?" |
   # Captures any sequence of characters starting with ; (tokenized).
   ;.* |
   # Captures a sequence of zero or more non special characters (e.g. symbols,
@@ -63,6 +65,15 @@ fun read_atom(r: Reader) : MalAtom {
     return if (is_number(t)) {
         MalNumber(t.toInt())
     }
+    else if (t[0] == '"') {
+        MalString(t.substring(1 .. t.length - 2))
+    }
+    else if (t == "true" || t == "false") {
+        MalBoolean(t == "true")
+    }
+    else if (t == "nil") {
+        MalNil()
+    }
     else {
         MalSymbol(t)
     }
@@ -78,10 +89,11 @@ fun check_limit() {
 }
 
 fun read_form(r: Reader, n: Int) : MalType {
-//    println("v8> " + " ".repeat(n) + "read_form")
+//    println("v9> " + " ".repeat(n) + "read_form")
     try {
         return when(r.peek()) {
             "("  -> read_list(r, n + 1) // )
+            "["  -> read_vec(r, n + 1) // ]
             else -> read_atom(r)
         }
     }
@@ -92,10 +104,10 @@ fun read_form(r: Reader, n: Int) : MalType {
 
 fun read_list(r: Reader, n: Int) : MalList {
     r.next() // Move past the opening paren.
-//    val say = { m: String -> println("v8> " + " ".repeat(n) + m) }
+//    val say = { m: String -> println("v9> " + " ".repeat(n) + m) }
     val list : MutableList<MalType> = mutableListOf()
     while(r.peek() != ")") { // balance parens x_x
-//        say("at char: " + r.peek())
+//        say("at token: " + r.peek())
         list.add(read_form(r, n))
         check_limit()
         // Safety limit to prevent the REPL never coming back.
@@ -105,6 +117,21 @@ fun read_list(r: Reader, n: Int) : MalList {
     return MalList(list)
 }
 
+fun read_vec(r: Reader, n: Int) : MalList {
+    r.next() // Move past the opening paren.
+//    val say = { m: String -> println("v9> " + " ".repeat(n) + m) }
+    val vec : MutableList<MalType> = mutableListOf()
+    while(r.peek() != "]") { // balance parens x_x
+//        say("at token: " + r.peek())
+        vec.add(read_form(r, n))
+        check_limit()
+        // Safety limit to prevent the REPL never coming back.
+    }
+    if(!r.isLast()) r.next()
+//    say("returning vec!")
+    return MalVector(vec)
+}
+
 // This function will peek at the first token in the Reader object and
 // switch on the first character of that token. If the character is a
 // left paren then read_list is called with the Reader
@@ -112,7 +139,7 @@ fun read_list(r: Reader, n: Int) : MalList {
 // return value from read_form is a mal data type.
 fun read_form_safely(r: Reader) : MalType {
     try {
-        return read_form(r, 0);
+        return read_form(r, 0)
     }
     finally {
         readLimit = 0
