@@ -95,25 +95,19 @@ fun EVAL(ast: MalType, env: Env, depth: Int) : MalType {
 
 fun PRINT(v: MalType) = pr_str(v)
 
-fun reduce_ops(f: (Int, Int) -> Int, args: MalList): MalNumber {
-    return args.atoms.map { v: MalType -> v as MalNumber }
-                     .reduce { acc, v -> MalNumber(f(acc.num, v.num)) }
-}
+fun rep(s: String) = PRINT(EVAL(READ(s), repl_env, 0))
 
 val repl_env = Env().apply {
     core.ns.forEach { (k,v) -> set(k, v) }
 }
 
-fun rep(s: String) {
-    println(PRINT(EVAL(READ(s), repl_env, 0)))
-}
-
 fun main(args: Array<String>) {
+    rep("(def! not (fn* [v] (if v false true)))")
     while(true) {
         print("user> ")
 
         try {
-            readLine()?.let { rep(it) }
+            readLine()?.let { println(rep(it)) }
         }
         catch(e: Exception) {
             println("Oh dear:" + e.toString())
