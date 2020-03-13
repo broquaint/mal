@@ -21,9 +21,10 @@ data class MalBoolean(val bool : Boolean) : MalAtom
 class MalNil() : MalAtom
 
 open class MalList(val atoms : List<MalType>) : MalType {
-    fun head() = atoms[0]
-    fun tail() = MalList(atoms.slice(1 .. atoms.size - 1))
-    fun last() = atoms.last()
+    fun head()    = atoms[0]
+    fun tail()    = MalList(atoms.slice(1 .. atoms.size - 1))
+    fun last()    = atoms.last()
+    fun butlast() = MalList(atoms.slice(0 .. atoms.size - 2))
     operator fun get(index: Int): MalType = atoms[index]
     // TODO Maybe implement complementN too.
 }
@@ -35,6 +36,13 @@ class MalFunc(val func : (MalList) -> MalType, val name : String = "anon") : Mal
         return func(args)
     }
 }
+
+class MalUserFunc(
+    val ast    : MalType,
+    val params : MalList,
+    val env    : Env,
+    val fn     : MalFunc
+) : MalType
 
 // Helper functions.
 fun emptyMalList() = MalList(listOf())
