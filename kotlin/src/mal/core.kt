@@ -49,6 +49,11 @@ object core {
         // count: treat the first parameter as a list and return the number of elements that it contains.
         to_fun("count") { MalNumber((it[0] as MalList).atoms.count()) },
 
+        // str: calls pr_str on each argument with print_readably set to false, concatenates the results together ("" separator), and returns the new string.
+        to_fun("str") {
+            MalString(it.atoms.map { pr_str(it) }.joinToString(""))
+        },        
+
         // =: see is_equal
         malSym("=") to malFun("equals?") {
             val a = it[0]
@@ -75,6 +80,40 @@ object core {
             val a = it[0] as MalNumber
             val b = it[1] as MalNumber
             MalBoolean(a.num >= b.num)
+        },
+
+        to_fun("read-string") {
+            read_str((it[0] as MalString).str)
+        },
+
+        to_fun("slurp") {
+            MalString(java.io.File((it[0] as MalString).str).readText())
+        },
+
+        to_fun("atom") {
+            MalCljAtom(it[0])
+        },
+        to_fun("atom?") {
+            MalBoolean(it[0] is MalCljAtom)
+        },
+        to_fun("deref") {
+            (it[0] as MalCljAtom).value
+        },
+        to_fun("reset!") {
+            val a = it[0] as MalCljAtom
+            a.value = it[1]
+            a.value
+        },
+        to_fun("swap!") {
+            val atom     = it[0] as MalCljAtom
+            val callable = it[1]
+            val fn       = if(callable is MalUserFunc) callable.fn else callable as MalFunc
+            // Pull out args if there are any.
+            val args = it.atoms.slice(2 .. (if(it.size > 2) it.size - 1 else 1))
+            // Call the function with atom value + any args.
+            val res  = fn(malListOf(listOf(atom.value) + args))
+            atom.value = res
+            res
         }
     )
 }

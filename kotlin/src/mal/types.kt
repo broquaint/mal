@@ -18,20 +18,26 @@ data class MalSymbol(val sym : String) : MalAtom
 
 data class MalBoolean(val bool : Boolean) : MalAtom
 
+// Would use MalAtom but that's already a thing :/
+data class MalCljAtom(var value : MalType) : MalType
+
 class MalNil() : MalAtom
 
 open class MalList(val atoms : List<MalType>) : MalType {
+    val size = atoms.size
     fun head()    = atoms[0]
     fun tail()    = MalList(atoms.slice(1 .. atoms.size - 1))
     fun last()    = atoms.last()
     fun butlast() = MalList(atoms.slice(0 .. atoms.size - 2))
+
     operator fun get(index: Int): MalType = atoms[index]
     // TODO Maybe implement complementN too.
 }
 
 class MalVector(atoms : List<MalType>) : MalList(atoms)
 
-class MalFunc(val func : (MalList) -> MalType, val name : String = "anon") : MalType {
+// Allow name to be set after the fact so functions in Env are named.
+class MalFunc(val func : (MalList) -> MalType, var name : String = "anon") : MalType {
     operator fun invoke(args: MalList) : MalType {
         return func(args)
     }
@@ -47,5 +53,6 @@ class MalUserFunc(
 // Helper functions.
 fun emptyMalList() = MalList(listOf())
 fun malListOf(vararg elems: MalType) = MalList(elems.asList())
+fun malListOf(elems: List<MalType>) = MalList(elems)
 fun malSym(sym: String) = MalSymbol(sym)
 fun malFun(name: String, f: (MalList) -> MalType) = MalFunc(f, name)

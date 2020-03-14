@@ -5,12 +5,15 @@ fun pr_str(v: MalType) : String {
         is MalList   -> {
             "(" + v.atoms.map { pr_str(it) }.joinToString(" ") + ")"
         }
-        is MalNumber  -> v.num.toString()
-        is MalString  -> v.str // TODO Support escapes
-        is MalSymbol  -> v.sym
-        is MalBoolean -> v.bool.toString()
-        is MalNil     -> "nil"
-        is MalFunc    -> "#<${v.name}>"
+        is MalNumber   -> v.num.toString()
+        is MalString   -> v.str // TODO Support escapes
+        is MalSymbol   -> v.sym
+        is MalBoolean  -> v.bool.toString()
+        // Use this specific format to make tests pass :/
+        is MalCljAtom  -> "(atom ${pr_str(v.value)})"
+        is MalNil      -> "nil"
+        is MalUserFunc -> "#<${v.fn.name}>"
+        is MalFunc     -> "#<${v.name}>"
         else -> ""
     }
 }

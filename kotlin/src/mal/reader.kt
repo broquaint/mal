@@ -23,7 +23,7 @@ var tokenizer = Regex("""
   [^\s\[\]{}('"`,;)]*
 )
 """,
-RegexOption.COMMENTS
+setOf(RegexOption.COMMENTS, RegexOption.MULTILINE)
 )
 
 // This function will take a single string and return an array/list of all the tokens (strings) in it.
@@ -33,8 +33,9 @@ fun tokenize(s: String) : List<String> {
     //     throw Exception("Failed tokenizing")
     // }
     return tokenizer.findAll(s)
-            .map { it.value.trim() }
+            .map    { it.value.trim() }
             .filter { it.length > 0 }
+            .filter { !it.startsWith(";") }
             .toList()
 }
 
@@ -81,15 +82,21 @@ fun read_atom(r: Reader) : MalAtom {
 
 var readLimit = 0
 
+// Safety limit to prevent the REPL never coming back.
 fun check_limit() {
     readLimit++
-    if (readLimit > 200) {
+    if (readLimit > 1024) {
         throw Exception("Parser found no end :/")
     }
 }
 
+// This function will peek at the first token in the Reader object and
+// switch on the first character of that token. If the character is a
+// left paren then read_list is called with the Reader
+// object. Otherwise, read_atom is called with the Reader Object. The
+// return value from read_form is a mal data type.
 fun read_form(r: Reader, n: Int) : MalType {
-//    println("v9> " + " ".repeat(n) + "read_form")
+//    println("v1> " + " ".repeat(n) + "read_form")
     try {
         return when(r.peek()) {
             "("  -> read_list(r, n + 1) // )
@@ -104,13 +111,12 @@ fun read_form(r: Reader, n: Int) : MalType {
 
 fun read_list(r: Reader, n: Int) : MalList {
     r.next() // Move past the opening paren.
-//    val say = { m: String -> println("v9> " + " ".repeat(n) + m) }
+//    val say = { m: String -> println("v1> " + " ".repeat(n) + m) }
     val list : MutableList<MalType> = mutableListOf()
     while(r.peek() != ")") { // balance parens x_x
 //        say("at token: " + r.peek())
         list.add(read_form(r, n))
         check_limit()
-        // Safety limit to prevent the REPL never coming back.
     }
     if(!r.isLast()) r.next()
 //    say("returning list!")
@@ -125,21 +131,20 @@ fun read_vec(r: Reader, n: Int) : MalList {
 //        say("at token: " + r.peek())
         vec.add(read_form(r, n))
         check_limit()
-        // Safety limit to prevent the REPL never coming back.
     }
     if(!r.isLast()) r.next()
 //    say("returning vec!")
     return MalVector(vec)
 }
 
-// This function will peek at the first token in the Reader object and
-// switch on the first character of that token. If the character is a
-// left paren then read_list is called with the Reader
-// object. Otherwise, read_atom is called with the Reader Object. The
-// return value from read_form is a mal data type.
 fun read_form_safely(r: Reader) : MalType {
     try {
-        return read_form(r, 0)
+        return if(r.tokens.isEmpty()) {
+            emptyMalList()
+        }
+        else {
+            read_form(r, 0)
+        }
     }
     finally {
         readLimit = 0
