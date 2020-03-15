@@ -58,9 +58,11 @@ class Reader(val tokens: List<String>) {
 
 fun is_number(s: String) = Regex("\\d+").matches(s)
 
+fun make_atom(token: String) = MalList(listOf("deref", token).map(::malSym))
+
 // This function will look at the contents of the token and return the
 // appropriate scalar (simple/single) data type value.
-fun read_atom(r: Reader) : MalAtom {
+fun read_atom(r: Reader) : MalType {
 //    println("Reading atom: " + r)
     val t = r.next()
     return if (is_number(t)) {
@@ -74,6 +76,9 @@ fun read_atom(r: Reader) : MalAtom {
     }
     else if (t == "nil") {
         MalNil()
+    }
+    else if (t == "@") {
+        make_atom(r.next())
     }
     else {
         MalSymbol(t)
