@@ -114,6 +114,14 @@ object core {
             val res  = fn(malListOf(listOf(atom.value) + args))
             atom.value = res
             res
+        },
+
+        to_fun("cons") {
+            val rest = if(it.size > 1) it[1] as MalList else emptyMalList()
+            malListOf(listOf(it.head()) + rest.atoms)
+        },
+        to_fun("concat") {
+            malListOf(it.atoms.flatMap { (it as MalList).atoms })
         }
     )
 }
