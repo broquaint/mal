@@ -18,12 +18,64 @@ fun make_env(pairs: MalList, outer_env: Env, depth: Int) : Env {
     return new_env
 }
 
-fun is_true(cond : MalType) =
-    when(cond) {
+fun is_true(cond: MalType) =
+    when (cond) {
         is MalNil -> false
         is MalBoolean -> cond.bool
         else -> true
     }
+
+// First implement a helper function `is_pair` that returns true if the
+// parameter is a non-empty list.
+fun is_pair(p: MalType) = p is MalList && p.size > 0
+
+fun quasiquote(ast: List<MalType>) = quasiquote(*ast.toTypedArray())
+
+fun quasiquote(vararg ast: MalType): MalType {
+    println("Quasiquoting: " + ast.map(::pr_str).joinToString(" "))
+    // if `is_pair` of `ast` is false: return a new list containing:
+    //  a symbol named "quote" and `ast`.
+    if (ast[0] !is MalList || !is_pair(ast[0])) {
+        // XXX Should the symbol and ast be joined?
+        return malListOf(malSym("quote"), ast[0])
+    }
+    // We know ast[0] is now a list with stuff in it.
+    val fst  = ast[0]
+    val rest = ast.drop(1)
+    // else if the first element of `ast` is a symbol named "unquote":
+    // return the second element of `ast`.
+    return if (fst == malSym("unquote")) {
+        ast[1]
+    }
+    // if `is_pair` of the first element of `ast` is true and the first
+    // element of first element of `ast` (`ast[0][0]`) is a symbol named
+    // "splice-unquote": return a new list containing: a symbol named
+    // "concat", the second element of first element of `ast`
+    // (`ast[0][1]`), and the result of calling `quasiquote` with the
+    // second through last element of `ast`.
+    else if (is_pair(fst) && fst is MalList && fst.head() == malSym("splice-unquote")) {
+        malListOf(listOf(malSym("concat"), fst[1]) + quasiquote(rest))
+    }
+    // otherwise: return a new list containing: a symbol named "cons", the
+    // result of calling `quasiquote` on first element of `ast`
+    // (`ast[0]`), and the result of calling `quasiquote` with the second
+    // through last element of `ast`.
+    else {
+        val head = if (fst is MalList) fst.head() else fst
+        val tail = if (fst is MalList) fst.tail().atoms else rest
+        // XXX Assumes we'll only get a list i.e (qq (1 2 (3 4))) not (qq (1 2) 3 4)
+        malListOf(malSym("cons"), quasiquote(head), quasiquote(tail))
+    }
+}
+
+fun newqq(ast: MalType) : MalType {
+    return if (ast is MalList && ast.size > 0) {
+        malListOf(malSym("cons"), newqq(ast.head()), newqq(ast.tail()))
+    }
+    else {
+        malListOf(malSym("quote"), ast)
+    }
+}
 
 var eval_count = 0
 fun EVAL(cur_ast: MalType, cur_env: Env, depth: Int) : MalType {
@@ -34,7 +86,7 @@ fun EVAL(cur_ast: MalType, cur_env: Env, depth: Int) : MalType {
     var ast = cur_ast
     // Allow modification of which env is pointed at while evaluating.
     var env = cur_env
-    eval_loop@ while(true) {
+    eval_loop@ while (true) {
         eval_count++
         // The depth check is low enough so as not to hit a terminal StackOverflow error.
         // But eval_count is just an arbitrary limit.
@@ -95,6 +147,13 @@ fun EVAL(cur_ast: MalType, cur_env: Env, depth: Int) : MalType {
                         "quote" -> {
                             return rest.head()
                         }
+                        // This is called from `EVAL` with the first `ast` argument (second list element) and then `ast` is set to the result and execution continues at the top of the loop (TCO).
+                        "quasiquote" -> {
+                            // TODO TCO
+                            // XXX Support >1 args?
+                            ast = newqq(rest[0])
+                            continue@eval_loop // TCO
+                        }
                     }
                 }
 
@@ -152,7 +211,7 @@ fun main(args: Array<String>) {
 
         try {
             val line = readLine() ?: continue@repl
-            if (line.trim() == "quit") {
+            if (setOf("quit","exit").contains(line.trim())) {
                 println("Bye!")
                 break@repl
             }
