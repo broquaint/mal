@@ -6,7 +6,7 @@ fun pr_str(v: MalType) : String {
             "(" + v.atoms.map { pr_str(it) }.joinToString(" ") + ")"
         }
         is MalNumber   -> v.num.toString()
-        is MalString   -> v.str // TODO Support escapes
+        is MalString   -> "\"${v.str}\"" // TODO Support escapes
         is MalSymbol   -> v.sym
         is MalBoolean  -> v.bool.toString()
         // Use this specific format to make tests pass :/
