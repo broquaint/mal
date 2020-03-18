@@ -70,10 +70,14 @@ fun quasiquote(vararg ast: MalType): MalType {
 
 fun newqq(ast: MalType) : MalType {
     return if (ast is MalList && ast.size > 0) {
-        if (ast.head() == malSym("unquote"))
-            ast.tail().head()
+        val fst  = ast.head()
+        val rest = ast.tail()
+        if (fst == malSym("unquote"))
+            rest.head()
+        else if (fst is MalList && fst.head() == malSym("splice-unquote"))
+            malListOf(malSym("concat"), fst.tail().head(), newqq(rest))
         else
-            malListOf(malSym("cons"), newqq(ast.head()), newqq(ast.tail()))
+            malListOf(malSym("cons"), newqq(fst), newqq(rest))
     }
     else {
         malListOf(malSym("quote"), ast)
