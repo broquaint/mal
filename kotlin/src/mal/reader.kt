@@ -62,7 +62,7 @@ fun make_atom(token: String) = MalList(listOf("deref", token).map(::malSym))
 
 // This function will look at the contents of the token and return the
 // appropriate scalar (simple/single) data type value.
-fun read_atom(r: Reader) : MalType {
+fun read_atom(r: Reader, n: Int) : MalType {
 //    println("Reading atom: " + r)
     val t = r.next()
     return if (is_number(t)) {
@@ -79,6 +79,18 @@ fun read_atom(r: Reader) : MalType {
     }
     else if (t == "@") {
         make_atom(r.next())
+    }
+    else if (t == "'") {
+        malListOf(malSym("quote"), read_form(r, n))
+    }
+    else if (t == "`") {
+        malListOf(malSym("quasiquote"), read_form(r, n))
+    }
+    else if (t == "~") {
+        malListOf(malSym("unquote"), read_form(r, n))
+    }
+    else if (t == "~@") {
+        malListOf(malSym("splice-unquote"), read_form(r, n))
     }
     else {
         MalSymbol(t)
@@ -106,7 +118,7 @@ fun read_form(r: Reader, n: Int) : MalType {
         return when(r.peek()) {
             "("  -> read_list(r, n + 1) // )
             "["  -> read_vec(r, n + 1) // ]
-            else -> read_atom(r)
+            else -> read_atom(r, n + 1)
         }
     }
     catch(e: IndexOutOfBoundsException) {
