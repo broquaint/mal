@@ -36,26 +36,32 @@ interface MalSeq : MalType {
     // TODO Maybe implement complementN too?
 }
 
-class MalList(override val atoms : List<MalType>) : MalSeq
-class MalVector(override val atoms : List<MalType>) : MalSeq
+class MalList(override val atoms: List<MalType>) : MalSeq
+class MalVector(override val atoms: List<MalType>) : MalSeq
 
-// Allow name to be set after the fact so functions in Env are named.
-class MalFunc(val func : (MalSeq) -> MalType, var name : String = "anon") : MalType {
+typealias MalFn = (MalSeq) -> MalType
+
+open class MalCallable(val func: MalFn, var name: String) : MalType {
+    var isMacro = false
     operator fun invoke(args: MalSeq) : MalType {
         return func(args)
     }
 }
 
+// Allow name to be set after the fact so functions in Env are named.
+class MalFunc(func: MalFn, name: String = "anon") : MalCallable(func, name)
+
 class MalUserFunc(
-    val ast    : MalType,
-    val params : MalSeq,
-    val env    : Env,
-    val fn     : MalFunc
-) : MalType
+    val ast:    MalType,
+    val params: MalSeq,
+    val env:    Env,
+    name:   String = "anon",
+    func:   MalFn
+) : MalCallable(func, name)
 
 // Helper functions.
 fun emptyMalList() = MalList(listOf())
 fun malListOf(vararg elems: MalType) = MalList(elems.asList())
 fun malListOf(elems: List<MalType>) = MalList(elems)
 fun malSym(sym: String) = MalSymbol(sym)
-fun malFun(name: String, f: (MalSeq) -> MalType) = MalFunc(f, name)
+fun malFun(name: String, f: MalFn) = MalFunc(f, name)

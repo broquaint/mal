@@ -2,7 +2,7 @@ fun int_ops_reducer(f: (Int, Int) -> Int, args: MalSeq): MalNumber =
     args.atoms.map { v: MalType -> v as MalNumber }
               .reduce { acc, v -> MalNumber(f(acc.num, v.num)) }
 
-fun to_fun(name: String, f: (MalSeq) -> MalType) : Pair<MalSymbol, MalFunc> =
+fun to_fun(name: String, f: MalFn) : Pair<MalSymbol, MalFunc> =
     malSym(name) to malFun(name, f)
 
 // =: compare the first two parameters and return true if they are the same type and contain the same value.
@@ -105,9 +105,8 @@ object core {
             a.value
         },
         to_fun("swap!") {
-            val atom     = it[0] as MalCljAtom
-            val callable = it[1]
-            val fn       = if(callable is MalUserFunc) callable.fn else callable as MalFunc
+            val atom = it[0] as MalCljAtom
+            val fn   = it[1] as MalCallable
             // Pull out args if there are any.
             val args = it.atoms.slice(2 .. (if(it.size > 2) it.size - 1 else 1))
             // Call the function with atom value + any args.

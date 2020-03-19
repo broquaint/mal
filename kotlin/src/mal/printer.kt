@@ -15,7 +15,7 @@ fun pr_str(v: MalType) : String {
         // Use this specific format to make tests pass :/
         is MalCljAtom  -> "(atom ${pr_str(v.value)})"
         is MalNil      -> "nil"
-        is MalUserFunc -> "#<${v.fn.name}>"
+        is MalUserFunc -> "#<${v.name}>"
         is MalFunc     -> "#<${v.name}>"
         else -> ""
     }
