@@ -116,8 +116,8 @@ fun read_form(r: Reader, n: Int) : MalType {
 //    println("v1> " + " ".repeat(n) + "read_form")
     try {
         return when(r.peek()) {
-            "("  -> read_list(r, n + 1) // )
-            "["  -> read_vec(r, n + 1) // ]
+            "("  -> MalList(read_seq(")", r, n + 1))
+            "["  -> MalVector(read_seq("]", r, n + 1))
             else -> read_atom(r, n + 1)
         }
     }
@@ -126,32 +126,18 @@ fun read_form(r: Reader, n: Int) : MalType {
     }
 }
 
-fun read_list(r: Reader, n: Int) : MalList {
+fun read_seq(endTok: String, r: Reader, n: Int) : List<MalType> {
     r.next() // Move past the opening paren.
 //    val say = { m: String -> println("v1> " + " ".repeat(n) + m) }
     val list : MutableList<MalType> = mutableListOf()
-    while(r.peek() != ")") { // balance parens x_x
+    while(r.peek() != endTok) {
 //        say("at token: " + r.peek())
         list.add(read_form(r, n))
         check_limit()
     }
     if(!r.isLast()) r.next()
 //    say("returning list!")
-    return MalList(list)
-}
-
-fun read_vec(r: Reader, n: Int) : MalVector {
-    r.next() // Move past the opening paren.
-//    val say = { m: String -> println("v9> " + " ".repeat(n) + m) }
-    val vec : MutableList<MalType> = mutableListOf()
-    while(r.peek() != "]") { // balance parens x_x
-//        say("at token: " + r.peek())
-        vec.add(read_form(r, n))
-        check_limit()
-    }
-    if(!r.isLast()) r.next()
-//    say("returning vec!")
-    return MalVector(vec)
+    return list
 }
 
 fun read_form_safely(r: Reader) : MalType {
