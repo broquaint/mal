@@ -121,6 +121,33 @@ object core {
         },
         to_fun("concat") {
             malListOf(it.atoms.flatMap { (it as MalSeq).atoms })
+        },
+
+        to_fun("nth") {
+            val seq = it[0] as MalSeq
+            val idx = it[1] as MalNumber
+            seq[idx.num]
+        },
+        to_fun("first") {
+            val v = it[0]
+            if (v is MalNil) {
+                MalNil()
+            }
+            else if (v is MalSeq) {
+                if(v.size == 0) MalNil() else v.head()
+            }
+            else {
+                throw Exception("Can't fall 'first' on " + pr_str(v))
+            }
+        },
+        to_fun("rest") {
+            val v = it[0]
+            if (v is MalSeq) {
+                v.tail()
+            }
+            else {
+                throw Exception("Can't fall 'rest' on " + pr_str(v))
+            }
         }
     )
 }
