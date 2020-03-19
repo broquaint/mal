@@ -1,8 +1,8 @@
-fun int_ops_reducer(f: (Int, Int) -> Int, args: MalList): MalNumber =
+fun int_ops_reducer(f: (Int, Int) -> Int, args: MalSeq): MalNumber =
     args.atoms.map { v: MalType -> v as MalNumber }
               .reduce { acc, v -> MalNumber(f(acc.num, v.num)) }
 
-fun to_fun(name: String, f: (MalList) -> MalType) : Pair<MalSymbol, MalFunc> =
+fun to_fun(name: String, f: (MalSeq) -> MalType) : Pair<MalSymbol, MalFunc> =
     malSym(name) to malFun(name, f)
 
 // =: compare the first two parameters and return true if they are the same type and contain the same value.
@@ -14,7 +14,7 @@ fun is_equal(a: MalType, b: MalType) =
             is MalSymbol  -> a.sym  == (b as MalSymbol).sym
             is MalBoolean -> a.bool == (b as MalBoolean).bool
             is MalNil     -> true
-            is MalList    -> compare_lists(a, (b as MalList))
+            is MalSeq     -> compare_lists(a, (b as MalSeq))
             is MalFunc    -> a.func == (b as MalFunc).func
             else -> throw Exception("Unknown type $a in is_equal (aka =)")
         }
@@ -23,7 +23,7 @@ fun is_equal(a: MalType, b: MalType) =
         false
     }
 // In the case of equal length lists, each element of the list should be compared for equality and if they are the same return true, otherwise false.
-fun compare_lists(a: MalList, b: MalList) : Boolean {
+fun compare_lists(a: MalSeq, b: MalSeq) : Boolean {
     if(a.atoms.count() == b.atoms.count())
       return a.atoms.indices.all { v: Int -> is_equal(a.atoms[v], b.atoms[v]) }
     else
@@ -45,9 +45,9 @@ object core {
         // list?: return true if the first parameter is a list, false otherwise.
         to_fun("list?") { MalBoolean(it[0] is MalList) },
         // empty?: treat the first parameter as a list and return true if the list is empty and false if it contains any elements.
-        to_fun("empty?") { MalBoolean(it[0] is MalList && (it[0] as MalList).atoms.isEmpty()) },
+        to_fun("empty?") { MalBoolean(it[0] is MalSeq && (it[0] as MalSeq).atoms.isEmpty()) },
         // count: treat the first parameter as a list and return the number of elements that it contains.
-        to_fun("count") { MalNumber((it[0] as MalList).atoms.count()) },
+        to_fun("count") { MalNumber((it[0] as MalSeq).atoms.count()) },
 
         // str: calls pr_str on each argument with print_readably set to false, concatenates the results together ("" separator), and returns the new string.
         to_fun("str") {
@@ -117,11 +117,11 @@ object core {
         },
 
         to_fun("cons") {
-            val rest = if(it.size > 1) it[1] as MalList else emptyMalList()
+            val rest = if(it.size > 1) it[1] as MalSeq else emptyMalList()
             malListOf(listOf(it.head()) + rest.atoms)
         },
         to_fun("concat") {
-            malListOf(it.atoms.flatMap { (it as MalList).atoms })
+            malListOf(it.atoms.flatMap { (it as MalSeq).atoms })
         }
     )
 }

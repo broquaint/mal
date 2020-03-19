@@ -140,7 +140,7 @@ fun read_list(r: Reader, n: Int) : MalList {
     return MalList(list)
 }
 
-fun read_vec(r: Reader, n: Int) : MalList {
+fun read_vec(r: Reader, n: Int) : MalVector {
     r.next() // Move past the opening paren.
 //    val say = { m: String -> println("v9> " + " ".repeat(n) + m) }
     val vec : MutableList<MalType> = mutableListOf()

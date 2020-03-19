@@ -8,7 +8,7 @@ fun eval_ast(ast: MalType, env: Env, depth: Int) : MalType {
     }
 }
 
-fun make_env(pairs: MalList, outer_env: Env, depth: Int) : Env {
+fun make_env(pairs: MalSeq, outer_env: Env, depth: Int) : Env {
     val new_env = Env(outer_env)
     for (idx in pairs.atoms.indices step 2) {
         val k = pairs.atoms[idx] as MalSymbol
@@ -85,7 +85,7 @@ fun EVAL(cur_ast: MalType, cur_env: Env, depth: Int) : MalType {
                         }
                         "let*" -> {
                             // Set env (i.e. the local variable passed in as second parameter of EVAL) to the new let environment. 
-                            env = make_env((rest[0] as MalList), env, depth)
+                            env = make_env((rest[0] as MalSeq), env, depth)
                             //  Set ast (i.e. the local variable passed in as first parameter of EVAL) to be the second ast argument.
                             ast = ast[2]
                             continue@eval_loop // TCO
@@ -105,7 +105,7 @@ fun EVAL(cur_ast: MalType, cur_env: Env, depth: Int) : MalType {
                         }
                         "fn*" -> {
                             // The return value from the fn* special form will now become an object/structure with attributes that allow the default invoke case of EVAL to do TCO on mal functions. Those attributes are:
-                            val binds = rest[0] as MalList
+                            val binds = rest[0] as MalSeq
                             val body  = rest[1]
                             val func  = malFun("funccall") {
                                 EVAL(body, Env(env, binds, it), n)
