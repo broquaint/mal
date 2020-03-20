@@ -12,6 +12,7 @@ fun is_equal(a: MalType, b: MalType) =
             is MalNumber  -> a.num  == (b as MalNumber).num
             is MalString  -> a.str  == (b as MalString).str
             is MalSymbol  -> a.sym  == (b as MalSymbol).sym
+            is MalKeyword -> a.kw   == (b as MalKeyword).kw
             is MalBoolean -> a.bool == (b as MalBoolean).bool
             is MalNil     -> true
             is MalSeq     -> compare_lists(a, (b as MalSeq))
@@ -126,7 +127,7 @@ object core {
         to_fun("nth") {
             val seq = it[0] as MalSeq
             val idx = it[1] as MalNumber
-            seq[idx.num]
+            seq[idx]
         },
         to_fun("first") {
             val v = it[0]

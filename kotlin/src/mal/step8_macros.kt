@@ -3,6 +3,8 @@ fun READ(s: String) = read_str(s)
 fun eval_ast(ast: MalType, env: Env, depth: Int) : MalType {
     return when(ast) {
         is MalList   -> MalList(ast.atoms.map { EVAL(it, env, depth + 1) }.toList())
+        is MalVector -> MalVector(ast.atoms.map { EVAL(it, env, depth + 1) }.toList())
+        is MalMap    -> malMapOf(ast.pairs.map { (k,v) -> k to EVAL(v, env, depth + 1) })
         is MalSymbol -> env.get(ast)
         else -> ast
     }

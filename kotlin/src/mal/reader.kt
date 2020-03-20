@@ -77,6 +77,9 @@ fun read_atom(r: Reader, n: Int) : MalType {
     else if (t == "nil") {
         MalNil()
     }
+    else if (t[0] == ':') {
+        MalKeyword(t.substring(1 .. t.length - 1))
+    }
     else if (t == "@") {
         make_atom(r.next())
     }
@@ -95,6 +98,16 @@ fun read_atom(r: Reader, n: Int) : MalType {
     else {
         MalSymbol(t)
     }
+}
+
+fun read_map(pairs: List<MalType>) : MalMap {
+    val map : MutableMap<MalString, MalType> = mutableMapOf()
+    for (idx in pairs.indices step 2) {
+        val k = pairs[idx] as MalString
+        val v = pairs[idx + 1]
+        map[k] = v
+    }
+    return MalMap(map)
 }
 
 var readLimit = 0
@@ -118,6 +131,7 @@ fun read_form(r: Reader, n: Int) : MalType {
         return when(r.peek()) {
             "("  -> MalList(read_seq(")", r, n + 1))
             "["  -> MalVector(read_seq("]", r, n + 1))
+            "{"  -> read_map(read_seq("}", r, n + 1))
             else -> read_atom(r, n + 1)
         }
     }
