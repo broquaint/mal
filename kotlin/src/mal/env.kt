@@ -6,8 +6,18 @@ class Env(val outer: Env? = null,
     val data : MutableMap<MalSymbol, MalType> = mutableMapOf()
 
     init {
-        for(idx in binds.atoms.indices) {
-            set(binds.atoms[idx] as MalSymbol, exprs.atoms[idx])
+        // Modify the constructor/initializer for environments, so that if a "&" symbol is encountered in the binds list, the next symbol in the binds list after the "&" is bound to the rest of the exprs list that has not been bound yet.
+        var vals = exprs.atoms
+        bind_loop@ for(idx in binds.atoms.indices) {
+            val bind = binds.atoms[idx] as MalSymbol
+            if (bind == malSym("&")) {
+                val lastBind = binds.atoms[idx + 1] as MalSymbol
+                set(lastBind, malListOf(vals.slice(idx .. vals.size - 1)))
+                break@bind_loop
+            }
+            else {
+                set(bind, vals[idx])
+            }
         }
     }
 

@@ -172,15 +172,8 @@ fun EVAL(cur_ast: MalType, cur_env: Env, depth: Int) : MalType {
                 val args = op.tail()
 
                 if(func is MalUserFunc) {
-                    //  set ast to the ast attribute of f.
-                    // Generate a new environment using the env and params attributes of f as the outer and binds arguments and rest ast arguments (list elements 2 through the end) as the exprs argument. Set env to the new environment. Continue at the beginning of the loop.
                     ast = func.ast
-                    val binds = func.params.atoms.mapIndexed { index, atom ->
-                        val k = atom as MalSymbol
-                        val v = args[index]
-                        listOf(k,v)
-                    }.flatten().let { MalList(it) }
-                    env = make_env(binds, func.env, depth)
+                    env = Env(func.env, func.params, args)
                     continue@eval_loop // TCO
                 }
                 else if(func is MalFunc) {
