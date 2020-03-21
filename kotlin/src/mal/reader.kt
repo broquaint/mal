@@ -14,7 +14,7 @@ var tokenizer = Regex("""
   # it was preceded by a backslash in which case it includes it until the next
   # double-quote (tokenized). It will also match unbalanced strings (no ending
   # double-quote) which should be reported as an error.
-  "(?:.|[^"])*?" |
+  "(?:\\"|[^"])*?" |
   # Captures any sequence of characters starting with ; (tokenized).
   ;.* |
   # Captures a sequence of zero or more non special characters (e.g. symbols,
@@ -60,6 +60,19 @@ fun is_number(s: String) = Regex("\\d+").matches(s)
 
 fun make_atom(token: String) = MalList(listOf("deref", token).map(::malSym))
 
+// Reflect any changes in printer.kt
+val readEscapeMap = mapOf(
+    "\\\"" to "\"",
+    "\\n"  to "\n",
+    "\\\\" to "\\"
+)
+// Bleurgh, the escapes need escapes as they become interpolated into Regex ;_;
+// So we need to manage three levels escaping different >_<
+val readEscapes = Regex(listOf("\\\\\"", "\\\\n", "\\\\\\\\").joinToString("|", "(", ")"))
+
+fun make_string(s: String) =
+    MalString(s.replace(readEscapes) { readEscapeMap.get(it.value) ?: it.value })
+
 // This function will look at the contents of the token and return the
 // appropriate scalar (simple/single) data type value.
 fun read_atom(r: Reader, n: Int) : MalType {
@@ -69,7 +82,7 @@ fun read_atom(r: Reader, n: Int) : MalType {
         MalNumber(t.toInt())
     }
     else if (t[0] == '"') {
-        MalString(t.substring(1 .. t.length - 2))
+        make_string(t.substring(1 .. t.length - 2))
     }
     else if (t == "true" || t == "false") {
         MalBoolean(t == "true")

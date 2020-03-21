@@ -1,12 +1,12 @@
-fun int_ops_reducer(f: (Int, Int) -> Int, args: MalSeq): MalNumber =
+private fun int_ops_reducer(f: (Int, Int) -> Int, args: MalSeq): MalNumber =
     args.atoms.map { v: MalType -> v as MalNumber }
               .reduce { acc, v -> MalNumber(f(acc.num, v.num)) }
 
-fun to_fun(name: String, f: MalFn) : Pair<MalSymbol, MalFunc> =
+private fun to_fun(name: String, f: MalFn) : Pair<MalSymbol, MalFunc> =
     malSym(name) to malFun(name, f)
 
 // =: compare the first two parameters and return true if they are the same type and contain the same value.
-fun is_equal(a: MalType, b: MalType) =
+private fun is_equal(a: MalType, b: MalType) =
     if(a::class == b::class) {
         when(a) {
             is MalNumber  -> a.num  == (b as MalNumber).num
@@ -24,12 +24,18 @@ fun is_equal(a: MalType, b: MalType) =
         false
     }
 // In the case of equal length lists, each element of the list should be compared for equality and if they are the same return true, otherwise false.
-fun compare_lists(a: MalSeq, b: MalSeq) : Boolean {
+private fun compare_lists(a: MalSeq, b: MalSeq) : Boolean {
     if(a.atoms.count() == b.atoms.count())
       return a.atoms.indices.all { v: Int -> is_equal(a.atoms[v], b.atoms[v]) }
     else
       return false
 }
+
+private fun pr_str_core(seq: MalSeq) =
+    seq.atoms.map { as_str(it, readable=true) }.joinToString(" ")
+
+private fun str_core(seq: MalSeq) =
+    seq.atoms.map { as_str(it, readable=false) }.joinToString("")
 
 object core {
     val ns : Map<MalSymbol, MalFunc> = mutableMapOf(
@@ -39,8 +45,25 @@ object core {
         malSym("*") to malFun("times") { int_ops_reducer(Int::times, it) },
         malSym("/") to malFun("div")   { int_ops_reducer(Int::div,   it) },
 
-        // prn: call pr_str on the first parameter with print_readably set to true, prints the result to the screen and then return nil. Note that the full version of prn is a deferrable below.
-        to_fun("prn") { pr_str(it[0]); MalNil() },
+        // pr-str: calls `pr_str` on each argument with `print_readably` set to true, joins the results with " " and returns the new string.
+        to_fun("pr-str") {
+            MalString(pr_str_core(it))
+        },
+        // `str`: calls `pr_str` on each argument with `print_readably` set to false, concatenates the results together ("" separator), and returns the new string.
+        to_fun("str") {
+            MalString(str_core(it))
+        },
+        // prn:  calls `pr_str` on each argument with `print_readably` set to true, joins the results with " ", prints the string to the screen and then returns `nil`.
+        to_fun("prn") {
+            println(pr_str_core(it))
+            MalNil()
+        },
+        // `println`:  calls `pr_str` on each argument with `print_readably` set to false, joins the results with " ", prints the string to the screen and then returns `nil`.
+        to_fun("println") {
+            println(str_core(it))
+            MalNil()
+        },
+
         // list: take the parameters and return them as a list.
         to_fun("list") { it }, // we always get a list at this point
         // list?: return true if the first parameter is a list, false otherwise.
@@ -49,11 +72,6 @@ object core {
         to_fun("empty?") { MalBoolean(it[0] is MalSeq && (it[0] as MalSeq).atoms.isEmpty()) },
         // count: treat the first parameter as a list and return the number of elements that it contains.
         to_fun("count") { MalNumber((it[0] as MalSeq).atoms.count()) },
-
-        // str: calls pr_str on each argument with print_readably set to false, concatenates the results together ("" separator), and returns the new string.
-        to_fun("str") {
-            MalString(it.atoms.map { pr_str(it) }.joinToString(""))
-        },        
 
         // =: see is_equal
         malSym("=") to malFun("equals?") {
