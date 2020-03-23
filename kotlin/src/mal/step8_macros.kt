@@ -204,26 +204,32 @@ fun main(args: Array<String>) {
             else       -> res
         }
     })
-    repl_env.set(malSym("*ARGV*"), malListOf(args.map(::MalString)))
 
     rep("""(def! load-file (fn* [f] (eval (read-string (str "(do " (slurp f) ")")))))""")
     rep("(def! not (fn* [v] (if v false true)))")
 
-    repl@ while(true) {
-        print("user> ")
+    if(args.size > 0) {
+        repl_env.set(malSym("*ARGV*"), malListOf(args.drop(1).map(::MalString)))
+        rep("""(load-file "${args[0]}")""")
+    }
+    else {
+        repl_env.set(malSym("*ARGV*"), emptyMalList())
+        repl@ while(true) {
+            print("user> ")
 
-        try {
-            val line = readLine() ?: continue@repl
-            if (setOf("quit","exit").contains(line.trim())) {
-                println("Bye!")
-                break@repl
+            try {
+                val line = readLine() ?: continue@repl
+                if (setOf("quit","exit").contains(line.trim())) {
+                    println("Bye!")
+                    break@repl
+                }
+                println(rep(line))
             }
-            println(rep(line))
-        }
-        catch(e: Exception) {
-            println("Oh dear:" + e.toString())
-            e.printStackTrace()
-            eval_count = 0
+            catch(e: Exception) {
+                println("Oh dear:" + e.toString())
+                e.printStackTrace()
+                eval_count = 0
+            }
         }
     }
 }
