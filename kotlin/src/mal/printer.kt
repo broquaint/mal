@@ -38,7 +38,8 @@ fun as_str(v: MalType, readable: Boolean) : String {
         is MalNil      -> "nil"
         is MalUserFunc -> "#<${v.name}>"
         is MalFunc     -> "#<${v.name}>"
-        else -> ""
+        is MalUserEx   -> "Exception raised: "+as_str(v, readable)
+        else -> "Can't stringify a "+v::class
     }
 }
 
@@ -46,5 +47,5 @@ fun as_str(v: MalType, readable: Boolean) : String {
 // str end up with multiply quoted strings.
 fun pr_str(v: MalType, readable: Boolean = true) : String {
     val s = as_str(v, readable)
-    return if(v is MalString) "\"$s\"" else s
+    return if(v is MalString && v !is MalKeyword) "\"$s\"" else s
 }

@@ -34,7 +34,7 @@ class Env(val outer: Env? = null,
 
     // get: takes a symbol key and uses the find method to locate the environment with the key, then returns the matching value. If no key is found up the outer chain, then throws/raises a "not found" error.
     fun get(key: MalSymbol): MalType {
-        val env = find(key) ?: throw Exception("Could not find '${key.sym}' in env")
+        val env = find(key) ?: throw MalCoreEx("Could not find '${key.sym}' in env")
         return env.data.getValue(key)
     }
 }

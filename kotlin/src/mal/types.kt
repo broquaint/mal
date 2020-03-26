@@ -24,7 +24,7 @@ data class MalKeyword(val kw: String) : MalString(kw)
 // Would use MalAtom but that's already a thing :/
 data class MalCljAtom(var value : MalType) : MalType
 
-class MalNil() : MalAtom
+class MalNil : MalAtom
 
 interface MalSeq : MalType {
     val atoms : List<MalType>
@@ -40,8 +40,8 @@ interface MalSeq : MalType {
     // TODO Maybe implement complementN too?
 }
 
-class MalList(override val atoms: List<MalType>) : MalSeq
-class MalVector(override val atoms: List<MalType>) : MalSeq
+data class MalList(override val atoms: List<MalType>) : MalSeq
+data class MalVector(override val atoms: List<MalType>) : MalSeq
 
 class MalMap(val pairs: Map<MalString, MalType>) : MalType {
     operator fun get(k: MalString): MalType = pairs[k] ?: MalNil()
@@ -66,6 +66,9 @@ class MalUserFunc(
     name:   String = "anon",
     func:   MalFn
 ) : MalCallable(func, name)
+
+data class MalUserEx(val src: MalType) : Exception("Exception raised"), MalType
+data class MalCoreEx(val msg: String) : Exception(msg)
 
 // Helper functions.
 fun emptyMalList() = MalList(listOf())

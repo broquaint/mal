@@ -16,20 +16,27 @@ private fun is_equal(a: MalType, b: MalType) =
             is MalBoolean -> a.bool == (b as MalBoolean).bool
             is MalNil     -> true
             is MalSeq     -> compare_lists(a, (b as MalSeq))
+            is MalMap     -> compare_maps(a, (b as MalMap))
             is MalFunc    -> a.func == (b as MalFunc).func
-            else -> throw Exception("Unknown type $a in is_equal (aka =)")
+            // XXX Not particularly useful but is_equal(a.src, b.src) hits:
+            // error: type checking has run into a recursive problem
+            is MalUserEx  -> a.src == (b as MalUserEx).src
+            else -> throw MalCoreEx("Unknown type $a in is_equal (aka =)")
         }
     }
     else {
         false
     }
 // In the case of equal length lists, each element of the list should be compared for equality and if they are the same return true, otherwise false.
-private fun compare_lists(a: MalSeq, b: MalSeq) : Boolean {
+private fun compare_lists(a: MalSeq, b: MalSeq): Boolean {
     if(a.atoms.count() == b.atoms.count())
       return a.atoms.indices.all { v: Int -> is_equal(a.atoms[v], b.atoms[v]) }
     else
       return false
 }
+
+// TODO Implement!
+private fun compare_maps(a: MalMap, b: MalMap) = a == b
 
 private fun pr_str_core(seq: MalSeq) =
     seq.atoms.map { as_str(it, readable=true) }.joinToString(" ")
@@ -156,7 +163,7 @@ object core {
                 if(v.size == 0) MalNil() else v.head()
             }
             else {
-                throw Exception("Can't fall 'first' on " + pr_str(v))
+                throw MalCoreEx("Can't fall 'first' on " + pr_str(v))
             }
         },
         to_fun("rest") {
@@ -165,7 +172,13 @@ object core {
                 v.tail()
             }
             else {
-                throw Exception("Can't fall 'rest' on " + pr_str(v))
+                throw MalCoreEx("Can't fall 'rest' on " + pr_str(v))
+            }
+        },
+        to_fun("throw") {
+            throw when(it.size) {
+                0    -> MalUserEx(MalString("error raised anon"))
+                else -> MalUserEx(it[0])
             }
         }
     )

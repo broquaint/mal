@@ -30,7 +30,7 @@ setOf(RegexOption.COMMENTS, RegexOption.MULTILINE)
 fun tokenize(s: String) : List<String> {
     // For some reason this fails where findAll doesn't.
     // if (!tokenizer.matches(s)) {
-    //     throw Exception("Failed tokenizing")
+    //     throw MalCoreEx("Failed tokenizing")
     // }
     return tokenizer.findAll(s)
             .map    { it.value.trim() }
@@ -129,7 +129,7 @@ var readLimit = 0
 fun check_limit() {
     readLimit++
     if (readLimit > 1024) {
-        throw Exception("Parser found no end :/")
+        throw MalCoreEx("Parser found no end :/")
     }
 }
 
@@ -149,7 +149,7 @@ fun read_form(r: Reader, n: Int) : MalType {
         }
     }
     catch(e: IndexOutOfBoundsException) {
-        throw Exception("Ran out of tokens, missing right paren?")
+        throw MalCoreEx("Ran out of tokens, missing right paren?")
     }
 }
 
