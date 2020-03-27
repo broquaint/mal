@@ -123,6 +123,12 @@ fun read_map(pairs: List<MalType>) : MalMap {
     return MalMap(map)
 }
 
+fun seq_to_map(pairs: MalSeq) =
+    if(pairs.size % 2 == 0)
+        read_map(pairs.atoms)
+    else
+        throw MalUserEx(MalString("maps requires an even number of items, got ${pairs.size} items"))
+
 var readLimit = 0
 
 // Safety limit to prevent the REPL never coming back.

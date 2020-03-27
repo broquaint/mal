@@ -211,6 +211,56 @@ object core {
         },
         to_fun("symbol?") {
             MalBoolean(it[0] is MalSymbol)
+        },
+
+        to_fun("symbol") {
+            MalSymbol((it[0] as MalString).str)
+        },
+        to_fun("keyword") {
+            val kw = it[0]
+            if (kw is MalKeyword) kw else MalKeyword((kw as MalString).str)
+        },
+        to_fun("keyword?") {
+            MalBoolean(it[0] is MalKeyword)
+        },
+        to_fun("vector") {
+            MalVector(it.atoms)
+        },
+        to_fun("vector?") {
+            MalBoolean(it[0] is MalVector)
+        },
+        to_fun("hash-map") {
+            seq_to_map(it)
+        },
+        to_fun("map?") {
+            MalBoolean(it[0] is MalMap)
+        },
+        to_fun("assoc") {
+            val m = it[0] as MalMap
+            MalMap(m.pairs + seq_to_map(it.tail()).pairs)
+        },
+        to_fun("dissoc") {
+            val m = it[0] as MalMap
+            MalMap(m.pairs - it.tail().atoms.map { it as MalString })
+        },
+        to_fun("get") {
+            val m = it[0] as MalMap
+            m.pairs.getOrDefault(it[1] as MalString, MalNil())
+        },
+        to_fun("contains?") {
+            val m = it[0] as MalMap
+            MalBoolean(m.pairs.contains(it[1]))
+        },
+        to_fun("keys") {
+            val m = it[0] as MalMap
+            malListOf(m.pairs.keys.toList())
+        },
+        to_fun("vals") {
+            val m = it[0] as MalMap
+            malListOf(m.pairs.values.toList())
+        },
+        to_fun("sequential?") {
+            MalBoolean(it[0] is MalSeq)
         }
     )
 }
