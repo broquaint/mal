@@ -180,6 +180,22 @@ object core {
                 0    -> MalUserEx(MalString("error raised anon"))
                 else -> MalUserEx(it[0])
             }
+        },
+        to_fun("apply") {
+            // The first argument is a function and the last argument
+            // is list (or vector). The arguments between the function
+            // and the last argument (if there are any) are
+            // concatenated with the final argument to create the
+            // arguments that are used to call the function.
+            val fn     = it[0]     as MalCallable
+            val argSeq = it.last() as MalSeq
+            val args   = it.atoms.slice(1 .. (if(it.size > 2) it.size - 2 else 0))
+            fn(malListOf(argSeq.atoms + args))
+        },
+        to_fun("map") {
+            val fn   = it[0] as MalCallable
+            val args = it[1] as MalSeq
+            malListOf(args.atoms.map { fn(malListOf(it)) })
         }
     )
 }
