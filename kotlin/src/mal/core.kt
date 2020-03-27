@@ -175,12 +175,14 @@ object core {
                 throw MalCoreEx("Can't fall 'rest' on " + pr_str(v))
             }
         },
+
         to_fun("throw") {
             throw when(it.size) {
                 0    -> MalUserEx(MalString("error raised anon"))
                 else -> MalUserEx(it[0])
             }
         },
+
         to_fun("apply") {
             // The first argument is a function and the last argument
             // is list (or vector). The arguments between the function
@@ -196,6 +198,19 @@ object core {
             val fn   = it[0] as MalCallable
             val args = it[1] as MalSeq
             malListOf(args.atoms.map { fn(malListOf(it)) })
+        },
+
+        to_fun("nil?") {
+            MalBoolean(it[0] is MalNil)
+        },
+        to_fun("true?") {
+            MalBoolean(it[0] == MalBoolean(true))
+        },
+        to_fun("false?") {
+            MalBoolean(it[0] == MalBoolean(false))
+        },
+        to_fun("symbol?") {
+            MalBoolean(it[0] is MalSymbol)
         }
     )
 }
