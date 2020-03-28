@@ -49,23 +49,31 @@ class MalMap(val pairs: Map<MalString, MalType>) : MalType {
 
 typealias MalFn = (MalSeq) -> MalType
 
-open class MalCallable(val func: MalFn, var name: String) : MalType {
+abstract class MalCallable(val func: MalFn, var name: String, val meta: MalType) : MalType {
     var isMacro = false
-    operator fun invoke(args: MalSeq) : MalType {
-        return func(args)
-    }
+
+    operator fun invoke(args: MalSeq) = func(args)
+
+    abstract fun withMeta(m: MalType): MalCallable
 }
 
 // Allow name to be set after the fact so functions in Env are named.
-class MalFunc(func: MalFn, name: String = "anon") : MalCallable(func, name)
+class MalFunc(func: MalFn, name: String = "anon", meta: MalType = MalNil()) : MalCallable(func, name, meta) {
+    override fun withMeta(m: MalType) =
+        MalFunc(func, name, m)
+}
 
 class MalUserFunc(
     val ast:    MalType,
     val params: MalSeq,
     val env:    Env,
-    name:   String = "anon",
-    func:   MalFn
-) : MalCallable(func, name)
+    name:       String,
+    meta:       MalType,
+    func:       MalFn
+) : MalCallable(func, name, meta) {
+    override fun withMeta(m: MalType) =
+        MalUserFunc(ast, params, env, name, m, func)
+}
 
 data class MalUserEx(val src: MalType) : Exception("Exception raised"), MalType
 data class MalCoreEx(val msg: String) : Exception(msg)

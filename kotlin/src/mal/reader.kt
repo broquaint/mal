@@ -93,6 +93,11 @@ fun read_atom(r: Reader, n: Int) : MalType {
     else if (t[0] == ':') {
         MalKeyword(t.substring(1 .. t.length - 1))
     }
+    else if (t[0] == '^') {
+        val meta = read_form(r, n)
+        val func = read_form(r, n)
+        malListOf(malSym("with-meta"), func, meta)
+    }
     else if (t == "@") {
         make_atom(r.next())
     }

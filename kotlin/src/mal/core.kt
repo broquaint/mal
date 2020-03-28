@@ -44,6 +44,8 @@ private fun pr_str_core(seq: MalSeq) =
 private fun str_core(seq: MalSeq) =
     seq.atoms.map { as_str(it, readable=false) }.joinToString("")
 
+private val eof = ""
+
 object core {
     val ns : Map<MalSymbol, MalFunc> = mutableMapOf(
         // Basic number ops.
@@ -261,6 +263,21 @@ object core {
         },
         to_fun("sequential?") {
             MalBoolean(it[0] is MalSeq)
+        },
+
+        to_fun("readline") {
+            print((it[0] as MalString).str)
+            val line = readLine()
+            if (line == null) MalNil() else MalString(line.trim())
+        },
+
+        to_fun("meta") {
+            val f = it[0] as MalCallable
+            f.meta
+        },
+        to_fun("with-meta") {
+            val f = it[0] as MalCallable
+            f.withMeta(it[1])
         }
     )
 }
