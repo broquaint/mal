@@ -232,14 +232,14 @@ object core {
             MalBoolean(it[0] is MalVector)
         },
         to_fun("hash-map") {
-            seq_to_map(it)
+            make_map(it)
         },
         to_fun("map?") {
             MalBoolean(it[0] is MalMap)
         },
         to_fun("assoc") {
             val m = it[0] as MalMap
-            MalMap(m.pairs + seq_to_map(it.tail()).pairs)
+            MalMap(m.pairs + make_map(it.tail()).pairs)
         },
         to_fun("dissoc") {
             val m = it[0] as MalMap

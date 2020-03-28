@@ -2,7 +2,7 @@
 // of the regular expression a new token will be created.
 
 // TODO Support escaped double quotes e.g "foo \"bar\" baz" -> """foo "bar" baz"""
-var tokenizer = Regex("""
+private var tokenizer = Regex("""
 # Matches any number of whitespaces or commas
 [\s,]*
 (?:
@@ -43,45 +43,39 @@ fun tokenize(s: String) : List<String> {
 class Reader(val tokens: List<String>) {
     var pos = 0
     // returns the token at the current position and increments the position
-    fun next() : String {
-        val s = tokens[pos]
-        pos++
-        return s
-    }
-
+    fun next() = tokens[pos++]
     // Check whether we're at the end.
     fun isLast() = pos == (tokens.size - 1)
     // just returns the token at the current position.
     fun peek() = tokens[pos]
 }
 
+private fun is_number(s: String) = Regex("\\d+").matches(s)
 
-fun is_number(s: String) = Regex("\\d+").matches(s)
+private fun is_bool(s: String) = setOf("true", "false").contains(s)
 
-fun make_atom_deref(token: String) = MalList(listOf("deref", token).map(::malSym))
+private fun make_atom_deref(token: String) = MalList(listOf("deref", token).map(::malSym))
 
 // Reflect any changes in printer.kt
-val readEscapeMap = mapOf(
+private val readEscapeMap = mapOf(
     "\\\"" to "\"",
     "\\n"  to "\n",
     "\\\\" to "\\"
 )
 // Bleurgh, the escapes need escapes as they become interpolated into Regex ;_;
 // So we need to manage three levels escaping different >_<
-val readEscapes = Regex(listOf("\\\\\"", "\\\\n", "\\\\\\\\").joinToString("|", "(", ")"))
+private val readEscapes = Regex(listOf("\\\\\"", "\\\\n", "\\\\\\\\").joinToString("|", "(", ")"))
 
-fun make_string(s: String) =
+private fun make_string(s: String) =
     MalString(s.replace(readEscapes) { readEscapeMap.get(it.value) ?: it.value })
 
-fun make_with_meta(r: Reader, n: Int): MalType {
+private fun make_with_meta(r: Reader, n: Int): MalType {
     val meta = read_form(r, n)
     val func = read_form(r, n)
     return malListOf(malSym("with-meta"), func, meta)
 }
 
-private fun is_bool(s: String) = setOf("true", "false").contains(s)
-
-fun read_atom(r: Reader, n: Int) : MalType {
+private fun read_atom(r: Reader, n: Int) : MalType {
     //    println("Reading atom: " + r)
     val t = r.next()
     return when {
@@ -100,7 +94,10 @@ fun read_atom(r: Reader, n: Int) : MalType {
     }
 }
 
-fun read_map(pairs: List<MalType>) : MalMap {
+private fun make_map(pairs: List<MalType>) : MalMap {
+    if(pairs.size % 2 != 0)
+        throw MalUserEx(MalString("maps requires an even number of items, got ${pairs.size} items"))
+
     val map : MutableMap<MalString, MalType> = mutableMapOf()
     for (idx in pairs.indices step 2) {
         val k = pairs[idx] as MalString
@@ -110,16 +107,12 @@ fun read_map(pairs: List<MalType>) : MalMap {
     return MalMap(map)
 }
 
-fun seq_to_map(pairs: MalSeq) =
-    if(pairs.size % 2 == 0)
-        read_map(pairs.atoms)
-    else
-        throw MalUserEx(MalString("maps requires an even number of items, got ${pairs.size} items"))
+fun make_map(pairs: MalSeq) = make_map(pairs.atoms)
 
-var readLimit = 0
+private var readLimit = 0
 
 // Safety limit to prevent the REPL never coming back.
-fun check_limit() {
+private fun check_limit() {
     readLimit++
     if (readLimit > 1024) {
         throw MalCoreEx("Parser found no end :/")
@@ -137,7 +130,7 @@ fun read_form(r: Reader, n: Int) : MalType {
         return when(r.peek()) {
             "("  -> MalList(read_seq(")", r, n + 1))
             "["  -> MalVector(read_seq("]", r, n + 1))
-            "{"  -> read_map(read_seq("}", r, n + 1))
+            "{"  -> make_map(read_seq("}", r, n + 1))
             else -> read_atom(r, n + 1)
         }
     }
@@ -146,7 +139,7 @@ fun read_form(r: Reader, n: Int) : MalType {
     }
 }
 
-fun read_seq(endTok: String, r: Reader, n: Int) : List<MalType> {
+private fun read_seq(endTok: String, r: Reader, n: Int) : List<MalType> {
     r.next() // Move past the opening paren.
 //    val say = { m: String -> println("v1> " + " ".repeat(n) + m) }
     val list : MutableList<MalType> = mutableListOf()
@@ -160,7 +153,7 @@ fun read_seq(endTok: String, r: Reader, n: Int) : List<MalType> {
     return list
 }
 
-fun read_form_safely(r: Reader) : MalType {
+private fun read_form_safely(r: Reader) : MalType {
     try {
         return if(r.tokens.isEmpty()) {
             emptyMalList()

@@ -80,7 +80,7 @@ data class MalCoreEx(val msg: String) : Exception(msg)
 
 // Helper functions.
 fun emptyMalList() = MalList(listOf())
-fun malListOf(vararg elems: MalType) = MalList(elems.asList())
+fun malListOf(vararg elems: MalType) = malListOf(elems.asList())
 fun malListOf(elems: List<MalType>) = MalList(elems)
 fun malMapOf(elems: List<Pair<MalString, MalType>>) = MalMap(mapOf(*elems.toTypedArray()))
 fun malSym(sym: String) = MalSymbol(sym)
