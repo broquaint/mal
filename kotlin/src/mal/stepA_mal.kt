@@ -225,6 +225,7 @@ fun main(args: Array<String>) {
             else       -> res
         }
     })
+    repl_env.set(malSym("*host-language*"), MalString("Kotlin"))
 
     rep("""(def! load-file (fn* [f] (eval (read-string (str "(do " (slurp f) ")")))))""")
     rep("""(defmacro! cond (fn* (& xs) (if (> (count xs) 0) (list 'if (first xs) (if (> (count xs) 1) (nth xs 1) (throw "odd number of forms to cond")) (cons 'cond (rest (rest xs)))))))""")
@@ -237,6 +238,7 @@ fun main(args: Array<String>) {
     }
     else {
         repl_env.set(malSym("*ARGV*"), emptyMalList())
+        rep("""(println (str "Mal [" *host-language* "]"))""")
         repl@ while(true) {
             print("user> ")
 
