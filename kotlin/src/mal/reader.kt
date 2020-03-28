@@ -58,7 +58,7 @@ class Reader(val tokens: List<String>) {
 
 fun is_number(s: String) = Regex("\\d+").matches(s)
 
-fun make_atom(token: String) = MalList(listOf("deref", token).map(::malSym))
+fun make_atom_deref(token: String) = MalList(listOf("deref", token).map(::malSym))
 
 // Reflect any changes in printer.kt
 val readEscapeMap = mapOf(
@@ -73,48 +73,30 @@ val readEscapes = Regex(listOf("\\\\\"", "\\\\n", "\\\\\\\\").joinToString("|", 
 fun make_string(s: String) =
     MalString(s.replace(readEscapes) { readEscapeMap.get(it.value) ?: it.value })
 
-// This function will look at the contents of the token and return the
-// appropriate scalar (simple/single) data type value.
+fun make_with_meta(r: Reader, n: Int): MalType {
+    val meta = read_form(r, n)
+    val func = read_form(r, n)
+    return malListOf(malSym("with-meta"), func, meta)
+}
+
+private fun is_bool(s: String) = setOf("true", "false").contains(s)
+
 fun read_atom(r: Reader, n: Int) : MalType {
-//    println("Reading atom: " + r)
+    //    println("Reading atom: " + r)
     val t = r.next()
-    return if (is_number(t)) {
-        MalNumber(t.toInt())
-    }
-    else if (t[0] == '"') {
-        make_string(t.substring(1 .. t.length - 2))
-    }
-    else if (t == "true" || t == "false") {
-        MalBoolean(t == "true")
-    }
-    else if (t == "nil") {
-        MalNil()
-    }
-    else if (t[0] == ':') {
-        MalKeyword(t.substring(1 .. t.length - 1))
-    }
-    else if (t[0] == '^') {
-        val meta = read_form(r, n)
-        val func = read_form(r, n)
-        malListOf(malSym("with-meta"), func, meta)
-    }
-    else if (t == "@") {
-        make_atom(r.next())
-    }
-    else if (t == "'") {
-        malListOf(malSym("quote"), read_form(r, n))
-    }
-    else if (t == "`") {
-        malListOf(malSym("quasiquote"), read_form(r, n))
-    }
-    else if (t == "~") {
-        malListOf(malSym("unquote"), read_form(r, n))
-    }
-    else if (t == "~@") {
-        malListOf(malSym("splice-unquote"), read_form(r, n))
-    }
-    else {
-        MalSymbol(t)
+    return when {
+        t[0] == '"'  -> make_string(t.substring(1 .. t.length - 2))
+        t[0] == ':'  -> MalKeyword(t.substring(1 .. t.length - 1))
+        t[0] == '^'  -> make_with_meta(r, n)
+        is_number(t) -> MalNumber(t.toInt())
+        is_bool(t)   -> MalBoolean(t == "true")
+        t == "nil"   -> MalNil()
+        t == "@"     -> make_atom_deref(r.next())
+        t == "'"     -> malListOf(malSym("quote"), read_form(r, n))
+        t == "`"     -> malListOf(malSym("quasiquote"), read_form(r, n))
+        t == "~"     -> malListOf(malSym("unquote"), read_form(r, n))
+        t == "~@"    -> malListOf(malSym("splice-unquote"), read_form(r, n))
+        else         -> MalSymbol(t)
     }
 }
 
