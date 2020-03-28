@@ -243,11 +243,12 @@ object core {
         },
         to_fun("dissoc") {
             val m = it[0] as MalMap
-            MalMap(m.pairs - it.tail().atoms.map { it as MalString })
+            MalMap(m.pairs - it.tail().atoms.map { it as MalKey })
         },
         to_fun("get") {
             val m = it[0] as MalMap
-            m.pairs.getOrDefault(it[1] as MalString, MalNil())
+            val k = it[1] as MalKey
+            m[k]
         },
         to_fun("contains?") {
             val m = it[0] as MalMap

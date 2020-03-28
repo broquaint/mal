@@ -98,9 +98,9 @@ private fun make_map(pairs: List<MalType>) : MalMap {
     if(pairs.size % 2 != 0)
         throw MalUserEx(MalString("maps requires an even number of items, got ${pairs.size} items"))
 
-    val map : MutableMap<MalString, MalType> = mutableMapOf()
+    val map : MutableMap<MalKey, MalType> = mutableMapOf()
     for (idx in pairs.indices step 2) {
-        val k = pairs[idx] as MalString
+        val k = pairs[idx] as MalKey
         val v = pairs[idx + 1]
         map[k] = v
     }

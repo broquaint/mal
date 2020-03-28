@@ -16,10 +16,10 @@ data class MalSymbol(val sym: String) : MalAtom
 
 data class MalBoolean(val bool: Boolean) : MalAtom
 
-open class MalString(val str: String) : MalAtom
+interface MalKey : MalType
 
-// XXX Inheriting from MalString is a bit shonky.
-data class MalKeyword(val kw: String) : MalString(kw)
+data class MalString(val str: String) : MalKey
+data class MalKeyword(val kw: String) : MalKey
 
 // Would use MalAtom but that's already a thing :/
 data class MalCljAtom(var value : MalType) : MalType
@@ -43,8 +43,8 @@ interface MalSeq : MalType {
 data class MalList(override val atoms: List<MalType>) : MalSeq
 data class MalVector(override val atoms: List<MalType>) : MalSeq
 
-class MalMap(val pairs: Map<MalString, MalType>) : MalType {
-    operator fun get(k: MalString): MalType = pairs[k] ?: MalNil()
+class MalMap(val pairs: Map<MalKey, MalType>) : MalType {
+    operator fun get(k: MalKey): MalType = pairs[k] ?: MalNil()
 }
 
 typealias MalFn = (MalSeq) -> MalType
@@ -82,6 +82,6 @@ data class MalCoreEx(val msg: String) : Exception(msg)
 fun emptyMalList() = MalList(listOf())
 fun malListOf(vararg elems: MalType) = malListOf(elems.asList())
 fun malListOf(elems: List<MalType>) = MalList(elems)
-fun malMapOf(elems: List<Pair<MalString, MalType>>) = MalMap(mapOf(*elems.toTypedArray()))
+fun malMapOf(elems: List<Pair<MalKey, MalType>>) = MalMap(mapOf(*elems.toTypedArray()))
 fun malSym(sym: String) = MalSymbol(sym)
 fun malFun(name: String, f: MalFn) = MalFunc(f, name)
