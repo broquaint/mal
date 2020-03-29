@@ -275,7 +275,7 @@ fun main(args: Array<String>) {
             print("user> ")
 
             try {
-                val line = readLine() ?: continue@repl
+                val line = readLine() ?: break@repl
                 if (setOf("quit", "exit").contains(line.trim())) {
                     println("Bye!")
                     break@repl
