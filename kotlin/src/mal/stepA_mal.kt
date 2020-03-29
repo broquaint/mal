@@ -142,7 +142,7 @@ fun EVAL(cur_ast: MalType, cur_env: Env, depth: Int) : MalType {
                         "if" -> {
                             // the condition continues to be evaluated, however, rather than evaluating the true or false branch, ast is set to the unevaluated value of the chosen branch.
                             ast = if(is_true(EVAL(rest[0], env, n))) rest[1] else
-                                  if(rest.atoms.count() == 3)        rest[2] else ast
+                                  if(rest.atoms.count() == 3)        rest[2] else MalNil()
                             continue@eval_loop // TCO
                         }
                         "fn*" -> {
