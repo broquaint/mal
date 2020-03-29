@@ -39,10 +39,10 @@ private fun compare_lists(a: MalSeq, b: MalSeq): Boolean {
 private fun compare_maps(a: MalMap, b: MalMap) = a == b
 
 private fun pr_str_core(seq: MalSeq) =
-    seq.atoms.map { as_str(it, readable=true) }.joinToString(" ")
+    seq.atoms.map { pr_str(it, print_readably=true) }.joinToString(" ")
 
 private fun str_core(seq: MalSeq) =
-    seq.atoms.map { as_str(it, readable=false) }.joinToString("")
+    seq.atoms.map { pr_str(it, print_readably=false) }.joinToString("")
 
 private val eof = ""
 
