@@ -50,7 +50,7 @@ class Reader(val tokens: List<String>) {
     fun peek() = tokens[pos]
 }
 
-private fun is_number(s: String) = Regex("\\d+").matches(s)
+private fun is_number(s: String) = Regex("-?\\d+").matches(s)
 
 private fun is_bool(s: String) = setOf("true", "false").contains(s)
 
