@@ -150,6 +150,26 @@ object core {
         to_fun("concat") {
             malListOf(it.atoms.flatMap { (it as MalSeq).atoms })
         },
+        to_fun("conj") {
+            val seq  = it[0] as MalSeq
+            val rest = it.tail().atoms
+            when(seq) {
+                is MalList   -> malListOf(rest.reversed() + seq.atoms)
+                else         -> MalVector(seq.atoms + rest)
+            }
+        },
+        // takes a list, vector, string, or nil. If an empty list, empty vector, or empty string ("") is passed in then nil is returned. Otherwise, a list is returned unchanged, a vector is converted into a list, and a string is converted to a list that containing the original string split into single character strings.
+        to_fun("seq") {
+            val s = it.head()
+            when(s) {
+                is MalList   -> if(s.size > 0) s else MalNil()
+                is MalVector -> if(s.size > 0) malListOf(s.atoms) else MalNil()
+                is MalString -> if(s.str.count() > 0)
+                                    malListOf(s.str.chunked(1).map(::MalString))
+                                else MalNil()
+                else -> MalNil()
+            }
+        },
 
         to_fun("nth") {
             val seq = it[0] as MalSeq
@@ -279,6 +299,25 @@ object core {
         to_fun("with-meta") {
             val f = it[0] as MalMeta
             f.withMeta(it[1])
+        },
+
+        to_fun("time-ms") {
+            MalNumber(java.time.Instant.now().toEpochMilli().toInt())
+        },
+
+        to_fun("string?") {
+            MalBoolean(it[0] is MalString)
+        },
+        to_fun("number?") {
+            MalBoolean(it[0] is MalNumber)
+        },
+        to_fun("fn?") {
+            val f = it[0]
+            MalBoolean(f is MalCallable && !f.isMacro)
+        },
+        to_fun("macro?") {
+            val f = it[0]
+            MalBoolean(f is MalCallable && f.isMacro)
         }
     )
 }
