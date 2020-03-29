@@ -273,11 +273,11 @@ object core {
         },
 
         to_fun("meta") {
-            val f = it[0] as MalCallable
+            val f = it[0] as MalMeta
             f.meta
         },
         to_fun("with-meta") {
-            val f = it[0] as MalCallable
+            val f = it[0] as MalMeta
             f.withMeta(it[1])
         }
     )

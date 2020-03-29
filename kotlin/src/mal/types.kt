@@ -26,8 +26,13 @@ data class MalCljAtom(var value : MalType) : MalType
 
 class MalNil : MalAtom
 
-interface MalSeq : MalType {
-    val atoms : List<MalType>
+interface MalMeta {
+    val meta: MalType
+    fun withMeta(m: MalType): MalType
+}
+
+interface MalSeq : MalMeta, MalType {
+    val atoms: List<MalType>
 
     val size: Int get() = atoms.size
     fun head()    = atoms[0]
@@ -40,21 +45,31 @@ interface MalSeq : MalType {
     // TODO Maybe implement complementN too?
 }
 
-data class MalList(override val atoms: List<MalType>) : MalSeq
-data class MalVector(override val atoms: List<MalType>) : MalSeq
+data class MalList(override val atoms: List<MalType>, override val meta: MalType = MalNil()) : MalSeq {
+    // XXX Not technically a copy ...
+    override fun withMeta(m: MalType) =
+        MalList(atoms, m)
+}
+data class MalVector(override val atoms: List<MalType>, override val meta: MalType = MalNil()) : MalSeq {
+    // XXX Not technically a copy ...
+    override fun withMeta(m: MalType) =
+        MalVector(atoms, m)
+}
 
-class MalMap(val pairs: Map<MalKey, MalType>) : MalType {
+class MalMap(val pairs: Map<MalKey, MalType>, override val meta: MalType = MalNil()) : MalMeta, MalType {
     operator fun get(k: MalKey): MalType = pairs[k] ?: MalNil()
+
+    // XXX Not technically a copy ...
+    override fun withMeta(m: MalType) =
+        MalMap(pairs, m)
 }
 
 typealias MalFn = (MalSeq) -> MalType
 
-abstract class MalCallable(val func: MalFn, var name: String, val meta: MalType) : MalType {
+abstract class MalCallable(val func: MalFn, var name: String, override val meta: MalType) : MalMeta, MalType {
     var isMacro = false
 
     operator fun invoke(args: MalSeq) = func(args)
-
-    abstract fun withMeta(m: MalType): MalCallable
 }
 
 // Allow name to be set after the fact so functions in Env are named.
