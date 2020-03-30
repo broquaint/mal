@@ -14,7 +14,7 @@ private var tokenizer = Regex("""
   # it was preceded by a backslash in which case it includes it until the next
   # double-quote (tokenized). It will also match unbalanced strings (no ending
   # double-quote) which should be reported as an error.
-  "(?:\\"|[^"])*?" |
+  "(?:\\"|[^"])*"? |
   # Captures any sequence of characters starting with ; (tokenized).
   ;.* |
   # Captures a sequence of zero or more non special characters (e.g. symbols,
@@ -26,6 +26,8 @@ private var tokenizer = Regex("""
 setOf(RegexOption.COMMENTS, RegexOption.MULTILINE)
 )
 
+private val commas = Regex("""^[\s,]*|[,\s]*$""", RegexOption.MULTILINE)
+
 // This function will take a single string and return an array/list of all the tokens (strings) in it.
 fun tokenize(s: String) : List<String> {
     // For some reason this fails where findAll doesn't.
@@ -33,7 +35,7 @@ fun tokenize(s: String) : List<String> {
     //     throw MalCoreEx("Failed tokenizing")
     // }
     return tokenizer.findAll(s)
-            .map    { it.value.trim() }
+            .map    { it.value.replace(commas, "") }
             .filter { it.length > 0 }
             .filter { !it.startsWith(";") }
             .toList()
@@ -67,7 +69,10 @@ private val readEscapeMap = mapOf(
 private val readEscapes = Regex(listOf("\\\\\"", "\\\\n", "\\\\\\\\").joinToString("|", "(", ")"))
 
 private fun make_string(s: String) =
-    MalString(s.replace(readEscapes) { readEscapeMap.get(it.value) ?: it.value })
+    if (s.last() == '"')
+        MalString(s.dropLast(1).replace(readEscapes) { readEscapeMap.get(it.value) ?: it.value })
+    else
+        throw MalCoreEx("Unexpected end of input, unbalanced quote?")
 
 private fun make_with_meta(r: Reader, n: Int): MalType {
     val meta = read_form(r, n)
@@ -79,8 +84,8 @@ private fun read_atom(r: Reader, n: Int) : MalType {
     //    println("Reading atom: " + r)
     val t = r.next()
     return when {
-        t[0] == '"'  -> make_string(t.substring(1 .. t.length - 2))
-        t[0] == ':'  -> MalKeyword(t.substring(1 .. t.length - 1))
+        t[0] == '"'  -> make_string(t.substring(1 .. t.lastIndex))
+        t[0] == ':'  -> MalKeyword(t.substring(1 .. t.lastIndex))
         t[0] == '^'  -> make_with_meta(r, n)
         is_number(t) -> MalNumber(t.toInt())
         is_bool(t)   -> MalBoolean(t == "true")
@@ -135,7 +140,7 @@ fun read_form(r: Reader, n: Int) : MalType {
         }
     }
     catch(e: IndexOutOfBoundsException) {
-        throw MalCoreEx("Ran out of tokens, missing right paren?")
+        throw MalCoreEx("Unexpected end of input, unbalanced paren/brace/bracket?")
     }
 }
 
