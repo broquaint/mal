@@ -11,7 +11,7 @@ private val printEscapeMap = mapOf(
 // Bleurgh, the escapes need escapes as they become interpolated into Regex ;_;
 // So we need to manage three levels escaping different >_<
 private val printEscapes =
-    Regex(listOf(q, "${bs}n", "$bs$bs(?![n$q])").joinToString("|", "(", ")"))
+    Regex(listOf(q, "${bs}n", "$bs$bs").joinToString("|", "(", ")"))
 
 private fun malstr_as_string(s: String) =
     q + s.replace(printEscapes) { printEscapeMap.get(it.value) ?: it.value } + q

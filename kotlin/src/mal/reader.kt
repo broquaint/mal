@@ -58,15 +58,18 @@ private fun is_bool(s: String) = setOf("true", "false").contains(s)
 
 private fun make_atom_deref(token: String) = MalList(listOf("deref", token).map(::malSym))
 
+// Use named variables otherwise we have to escape escaping x_x
+private val q  = "\u0022" // '"'  U+0022 &quot; QUOTATION MARK (Other_Punctuation)
+private val bs = "\u005C" // '\'  U+005C &bsol; REVERSE SOLIDUS (Other_Punctuation)
+
 // Reflect any changes in printer.kt
-private val readEscapeMap = mapOf(
-    "\\\"" to "\"",
-    "\\n"  to "\n",
-    "\\\\" to "\\"
+private var readEscapeMap = mapOf(
+    "$bs$q"  to q,    // \" to "
+    "${bs}n" to "\n", // \n to ␤
+    "$bs$bs" to bs    // \\ to \
 )
 // Bleurgh, the escapes need escapes as they become interpolated into Regex ;_;
-// So we need to manage three levels escaping different >_<
-private val readEscapes = Regex(listOf("\\\\\"", "\\\\n", "\\\\\\\\").joinToString("|", "(", ")"))
+private var readEscapes = Regex(listOf("$bs$bs$bs$bs", "(?<!$bs$bs)$bs$bs$q", "(?<!$bs$bs)$bs${bs}n").joinToString("|", "(", ")"))
 
 private fun make_string(s: String) =
     if (s.last() == '"')
