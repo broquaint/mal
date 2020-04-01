@@ -1,10 +1,10 @@
 fun READ(s: String) = read_str(s)
 
 val repl_env : Map<String, MalFunc> = mapOf(
-        "+" to MalFunc({ a, b -> MalNumber((a as MalNumber).num + (b as MalNumber).num) }),
-        "-" to MalFunc({ a, b -> MalNumber((a as MalNumber).num - (b as MalNumber).num) }),
-        "*" to MalFunc({ a, b -> MalNumber((a as MalNumber).num * (b as MalNumber).num) }),
-        "/" to MalFunc({ a, b -> MalNumber((a as MalNumber).num / (b as MalNumber).num) })
+        "+" to malFun("+") { MalNumber((it[0] as MalNumber).num + (it[1] as MalNumber).num) },
+        "-" to malFun("-") { MalNumber((it[0] as MalNumber).num - (it[1] as MalNumber).num) },
+        "*" to malFun("*") { MalNumber((it[0] as MalNumber).num * (it[1] as MalNumber).num) },
+        "/" to malFun("/") { MalNumber((it[0] as MalNumber).num / (it[1] as MalNumber).num) }
 )
 
 // Create a new function eval_ast which takes ast (mal data type) and
@@ -20,6 +20,8 @@ fun eval_ast(ast: MalType, env: Map<String, MalFunc>, depth: Int) : MalType {
 //    println(PRINT(ast))
     return when(ast) {
         is MalList   -> MalList(ast.atoms.map { EVAL(it, env, depth) }.toList())
+        is MalVector -> MalVector(ast.atoms.map { EVAL(it, env, depth + 1) }.toList())
+        is MalMap    -> malMapOf(ast.pairs.map { (k,v) -> k to EVAL(v, env, depth + 1) })
         is MalSymbol -> env[ast.sym] ?: throw Exception("Unknown symbol '${ast.sym}'")
         else -> ast
     }
