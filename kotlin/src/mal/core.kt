@@ -24,6 +24,10 @@ private fun is_equal(a: MalType, b: MalType) =
             else -> throw MalCoreEx("Unknown type $a in is_equal (aka =)")
         }
     }
+    // Handle class when comparing lists & vectors.
+    else if (a is MalSeq && b is MalSeq) {
+        compare_lists(a, b)
+    }
     else {
         false
     }
@@ -41,8 +45,8 @@ private fun compare_maps(a: MalMap, b: MalMap) = a == b
 private fun pr_str_core(seq: MalSeq) =
     seq.atoms.map { pr_str(it, print_readably=true) }.joinToString(" ")
 
-private fun str_core(seq: MalSeq) =
-    seq.atoms.map { pr_str(it, print_readably=false) }.joinToString("")
+private fun str_core(seq: MalSeq, joiner: String) =
+    seq.atoms.map { pr_str(it, print_readably=false) }.joinToString(joiner)
 
 private val eof = ""
 
@@ -60,7 +64,7 @@ object core {
         },
         // `str`: calls `pr_str` on each argument with `print_readably` set to false, concatenates the results together ("" separator), and returns the new string.
         to_fun("str") {
-            MalString(str_core(it))
+            MalString(str_core(it, joiner = ""))
         },
         // prn:  calls `pr_str` on each argument with `print_readably` set to true, joins the results with " ", prints the string to the screen and then returns `nil`.
         to_fun("prn") {
@@ -69,7 +73,7 @@ object core {
         },
         // `println`:  calls `pr_str` on each argument with `print_readably` set to false, joins the results with " ", prints the string to the screen and then returns `nil`.
         to_fun("println") {
-            println(str_core(it))
+            println(str_core(it, joiner = " "))
             MalNil()
         },
 
@@ -80,7 +84,10 @@ object core {
         // empty?: treat the first parameter as a list and return true if the list is empty and false if it contains any elements.
         to_fun("empty?") { MalBoolean(it[0] is MalSeq && (it[0] as MalSeq).atoms.isEmpty()) },
         // count: treat the first parameter as a list and return the number of elements that it contains.
-        to_fun("count") { MalNumber((it[0] as MalSeq).atoms.count()) },
+        to_fun("count") {
+            val seq = it[0]
+            MalNumber(if (seq is MalSeq) seq.atoms.count() else 0)
+        },
 
         // =: see is_equal
         malSym("=") to malFun("equals?") {

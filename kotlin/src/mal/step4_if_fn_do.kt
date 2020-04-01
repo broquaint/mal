@@ -13,6 +13,8 @@ fun eval_ast(ast: MalType, env: Env, depth: Int) : MalType {
 //    println(PRINT(ast))
     return when(ast) {
         is MalList   -> MalList(ast.atoms.map { EVAL(it, env, depth + 1) }.toList())
+        is MalVector -> MalVector(ast.atoms.map { EVAL(it, env, depth + 1) }.toList())
+        is MalMap    -> malMapOf(ast.pairs.map { (k,v) -> k to EVAL(v, env, depth + 1) })
         is MalSymbol -> env.get(ast)
         else -> ast
     }
@@ -28,7 +30,7 @@ fun eval_ast(ast: MalType, env: Env, depth: Int) : MalType {
 
 */
 
-fun make_env(pairs: MalList, outer_env: Env, depth: Int) : Env {
+fun make_env(pairs: MalSeq, outer_env: Env, depth: Int) : Env {
     val new_env = Env(outer_env)
     for (idx in pairs.atoms.indices step 2) {
         val k = pairs.atoms[idx] as MalSymbol
@@ -73,14 +75,15 @@ fun EVAL(ast: MalType, env: Env, depth: Int) : MalType {
                         val v = EVAL(args[1], env, n)
                         return env.set((args[0] as MalSymbol), v)
                     }
-                    "let*" -> return EVAL(args[1], make_env((args[0] as MalList), env, depth), n)
+                    "let*" -> return EVAL(args[1], make_env((args[0] as MalSeq), env, depth), n)
                     "do" -> return (eval_ast(args, env, depth) as MalList).last()
                     "if" -> {
-                        val body = if(is_true(EVAL(args[0], env, n))) args[1] else args[2]
+                        val body = if(is_true(EVAL(args[0], env, n))) args[1] else
+                                   if(args.atoms.count() == 3)        args[2] else MalNil()
                         return EVAL(body, env, n)
                     }
                     "fn*" -> {
-                        val binds = args[0] as MalList
+                        val binds = args[0] as MalSeq
                         val body  = args[1]
                         return malFun("funccall") { EVAL(body, Env(env, binds, it), n) }
                     }
