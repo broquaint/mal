@@ -13,6 +13,8 @@ fun eval_ast(ast: MalType, env: Env, depth: Int) : MalType {
 //    println(PRINT(ast))
     return when(ast) {
         is MalList   -> MalList(ast.atoms.map { EVAL(it, env, depth) }.toList())
+        is MalVector -> MalVector(ast.atoms.map { EVAL(it, env, depth + 1) }.toList())
+        is MalMap    -> malMapOf(ast.pairs.map { (k,v) -> k to EVAL(v, env, depth + 1) })
         is MalSymbol -> env.get(ast)
         else -> ast
     }
@@ -52,7 +54,7 @@ completion).
 
 */
 
-fun make_env(pairs: MalList, outer_env: Env, depth: Int) : Env {
+fun make_env(pairs: MalSeq, outer_env: Env, depth: Int) : Env {
     val new_env = Env(outer_env)
     for (idx in pairs.atoms.indices step 2) {
         val k = pairs.atoms[idx] as MalSymbol
@@ -88,7 +90,7 @@ fun EVAL(ast: MalType, env: Env, depth: Int) : MalType {
                         val v = EVAL(args[1], env, depth + 1)
                         return env.set((args[0] as MalSymbol), v)
                     }
-                    "let*" -> return EVAL(args[1], make_env((args[0] as MalList), env, depth), depth + 1)
+                    "let*" -> return EVAL(args[1], make_env((args[0] as MalSeq), env, depth), depth + 1)
                 }
             }
             val l = eval_ast(ast, env, depth + 1)
@@ -101,10 +103,10 @@ fun EVAL(ast: MalType, env: Env, depth: Int) : MalType {
 fun PRINT(v: MalType) = pr_str(v)
 
 val repl_env = Env().apply {
-    set(MalSymbol("+"), MalFunc({ a, b -> MalNumber((a as MalNumber).num + (b as MalNumber).num) }))
-    set(MalSymbol("-"), MalFunc({ a, b -> MalNumber((a as MalNumber).num - (b as MalNumber).num) }))
-    set(MalSymbol("*"), MalFunc({ a, b -> MalNumber((a as MalNumber).num * (b as MalNumber).num) }))
-    set(MalSymbol("/"), MalFunc({ a, b -> MalNumber((a as MalNumber).num / (b as MalNumber).num) }))
+    set(MalSymbol("+"), malFun("+") { MalNumber((it[0] as MalNumber).num + (it[1] as MalNumber).num) })
+    set(MalSymbol("-"), malFun("-") { MalNumber((it[0] as MalNumber).num - (it[1] as MalNumber).num) })
+    set(MalSymbol("*"), malFun("*") { MalNumber((it[0] as MalNumber).num * (it[1] as MalNumber).num) })
+    set(MalSymbol("/"), malFun("/") { MalNumber((it[0] as MalNumber).num / (it[1] as MalNumber).num) })
 }
 
 fun rep(s: String) {
