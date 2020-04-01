@@ -3,12 +3,14 @@ fun READ(s: String) = read_str(s)
 fun eval_ast(ast: MalType, env: Env, depth: Int) : MalType {
     return when(ast) {
         is MalList   -> MalList(ast.atoms.map { EVAL(it, env, depth + 1) }.toList())
+        is MalVector -> MalVector(ast.atoms.map { EVAL(it, env, depth + 1) }.toList())
+        is MalMap    -> malMapOf(ast.pairs.map { (k,v) -> k to EVAL(v, env, depth + 1) })
         is MalSymbol -> env.get(ast)
         else -> ast
     }
 }
 
-fun make_env(pairs: MalList, outer_env: Env, depth: Int) : Env {
+fun make_env(pairs: MalSeq, outer_env: Env, depth: Int) : Env {
     val new_env = Env(outer_env)
     for (idx in pairs.atoms.indices step 2) {
         val k = pairs.atoms[idx] as MalSymbol
@@ -59,13 +61,13 @@ fun EVAL(cur_ast: MalType, cur_env: Env, depth: Int) : MalType {
                             val v    = EVAL(rest[1], env, n)
                             val name = (rest[0] as MalSymbol)
                             if (v is MalUserFunc) {
-                                v.fn.name = name.sym
+                                v.name = name.sym
                             }
                             return env.set(name, v)
                         }
                         "let*" -> {
                             // Set env (i.e. the local variable passed in as second parameter of EVAL) to the new let environment. 
-                            env = make_env((rest[0] as MalList), env, depth)
+                            env = make_env((rest[0] as MalSeq), env, depth)
                             //  Set ast (i.e. the local variable passed in as first parameter of EVAL) to be the second ast argument.
                             ast = ast[2]
                             continue@eval_loop // TCO
@@ -80,17 +82,16 @@ fun EVAL(cur_ast: MalType, cur_env: Env, depth: Int) : MalType {
                         "if" -> {
                             // the condition continues to be evaluated, however, rather than evaluating the true or false branch, ast is set to the unevaluated value of the chosen branch.
                             ast = if(is_true(EVAL(rest[0], env, n))) rest[1] else
-                                  if(rest.atoms.count() == 3)        rest[2] else ast
+                                  if(rest.atoms.count() == 3)        rest[2] else MalNil()
                             continue@eval_loop // TCO
                         }
                         "fn*" -> {
                             // The return value from the fn* special form will now become an object/structure with attributes that allow the default invoke case of EVAL to do TCO on mal functions. Those attributes are:
-                            val binds = rest[0] as MalList
+                            val binds = rest[0] as MalSeq
                             val body  = rest[1]
-                            val func  = malFun("funccall") {
+                            return MalUserFunc(body, binds, env, "anon", MalNil()) {
                                 EVAL(body, Env(env, binds, it), n)
                             }
-                            return MalUserFunc(body, binds, env, func)
                         }
                     }
                 }
@@ -103,12 +104,7 @@ fun EVAL(cur_ast: MalType, cur_env: Env, depth: Int) : MalType {
                     //  set ast to the ast attribute of f.
                     // Generate a new environment using the env and params attributes of f as the outer and binds arguments and rest ast arguments (list elements 2 through the end) as the exprs argument. Set env to the new environment. Continue at the beginning of the loop.
                     ast = func.ast
-                    val binds = func.params.atoms.mapIndexed { index, atom ->
-                        val k = atom as MalSymbol
-                        val v = args[index]
-                        listOf(k,v)
-                    }.flatten().let { MalList(it) }
-                    env = make_env(binds, func.env, depth)
+                    env = Env(func.env, func.params, args)
                     continue@eval_loop // TCO
                 }
                 else if(func is MalFunc) {
@@ -144,21 +140,40 @@ fun main(args: Array<String>) {
     rep("""(def! load-file (fn* [f] (eval (read-string (str "(do " (slurp f) ")")))))""")
     rep("(def! not (fn* [v] (if v false true)))")
 
-    repl@ while(true) {
-        print("user> ")
+    if(args.size > 0) {
+        repl_env.set(malSym("*ARGV*"), malListOf(args.drop(1).map(::MalString)))
+        rep("""(load-file "${args[0]}")""")
+    }
+    else {
+        repl_env.set(malSym("*ARGV*"), emptyMalList())
+        repl@ while(true) {
+            print("user> ")
 
-        try {
-            val line = readLine() ?: continue@repl
-            if (line.trim() == "quit") {
-                println("Bye!")
-                break@repl
+            try {
+                val line = readLine() ?: break@repl
+                if (setOf("quit", "exit").contains(line.trim())) {
+                    println("Bye!")
+                    break@repl
+                }
+                println(rep(line))
             }
-            println(rep(line))
-        }
-        catch(e: Exception) {
-            println("Oh dear:" + e.toString())
-            e.printStackTrace()
-            eval_count = 0
+            catch(e: StackOverflowError) {
+                println("Hit stack overflow at ${e.stackTrace.size}, top 15 frames were:")
+                println(e.stackTrace.take(15).map{ "\t"+it }.joinToString("\n"))
+            }
+            catch(e: Exception) {
+                println(
+                    when(e) {
+                        is MalUserEx -> "Exception raised: " + pr_str(e.src)
+                        is MalCoreEx -> "Error encountered: " + e.msg
+                        else -> "Non mal exception: " + e.message
+                    }
+                )
+                e.printStackTrace()
+            }
+            finally {
+                eval_count = 0
+            }
         }
     }
 }
