@@ -197,11 +197,10 @@ object core {
         },
         to_fun("rest") {
             val v = it[0]
-            if (v is MalSeq) {
-                v.tail()
-            }
-            else {
-                throw MalCoreEx("Can't fall 'rest' on " + pr_str(v))
+            when(v) {
+                is MalSeq -> v.tail()
+                is MalNil -> emptyMalList()
+                else -> throw MalCoreEx("Can't fall 'rest' on " + pr_str(v))
             }
         },
 
