@@ -6,7 +6,7 @@ private fun to_fun(name: String, f: MalFn) : Pair<MalSymbol, MalFunc> =
     malSym(name) to malFun(name, f)
 
 // =: compare the first two parameters and return true if they are the same type and contain the same value.
-private fun is_equal(a: MalType, b: MalType) =
+private fun is_equal(a: MalType, b: MalType): Boolean =
     if(a::class == b::class) {
         when(a) {
             is MalNumber  -> a.num  == (b as MalNumber).num
@@ -18,29 +18,26 @@ private fun is_equal(a: MalType, b: MalType) =
             is MalSeq     -> compare_lists(a, (b as MalSeq))
             is MalMap     -> compare_maps(a, (b as MalMap))
             is MalFunc    -> a.func == (b as MalFunc).func
-            // XXX Not particularly useful but is_equal(a.src, b.src) hits:
-            // error: type checking has run into a recursive problem
-            is MalUserEx  -> a.src == (b as MalUserEx).src
+            is MalUserEx  -> is_equal(a.src, (b as MalUserEx).src)
             else -> throw MalCoreEx("Unknown type $a in is_equal (aka =)")
         }
     }
-    // Handle class when comparing lists & vectors.
+    // Handle case when comparing lists & vectors.
     else if (a is MalSeq && b is MalSeq) {
         compare_lists(a, b)
     }
     else {
         false
     }
-// In the case of equal length lists, each element of the list should be compared for equality and if they are the same return true, otherwise false.
-private fun compare_lists(a: MalSeq, b: MalSeq): Boolean {
-    if(a.atoms.count() == b.atoms.count())
-      return a.atoms.indices.all { v: Int -> is_equal(a.atoms[v], b.atoms[v]) }
-    else
-      return false
-}
 
-// TODO Implement!
-private fun compare_maps(a: MalMap, b: MalMap) = a == b
+// In the case of equal length lists, each element of the list should be compared for equality and if they are the same return true, otherwise false.
+private fun compare_lists(a: MalSeq, b: MalSeq): Boolean =
+    a.atoms.count() == b.atoms.count() &&
+    a.atoms.indices.all { is_equal(a[it], b[it]) }
+
+private fun compare_maps(a: MalMap, b: MalMap): Boolean =
+    a.pairs.size == b.pairs.size &&
+    a.pairs.all { (k, v) -> b.pairs.contains(k) && is_equal(v, b[k]) }
 
 private fun pr_str_core(seq: MalSeq) =
     seq.atoms.map { pr_str(it, print_readably=true) }.joinToString(" ")
@@ -51,7 +48,7 @@ private fun str_core(seq: MalSeq, joiner: String) =
 private val eof = ""
 
 object core {
-    val ns : Map<MalSymbol, MalFunc> = mutableMapOf(
+    val ns : Map<MalSymbol, MalFunc> = mapOf(
         // Basic number ops.
         malSym("+") to malFun("plus")  { int_ops_reducer(Int::plus,  it) },
         malSym("-") to malFun("minus") { int_ops_reducer(Int::minus, it) },
@@ -181,7 +178,7 @@ object core {
         to_fun("nth") {
             val seq = it[0] as MalSeq
             val idx = it[1] as MalNumber
-            seq[idx]
+            if (idx.num <= seq.atoms.lastIndex) seq[idx] else throw MalUserEx("the index ${idx} is out of bounds for ${pr_str(seq)}")
         },
         to_fun("first") {
             val v = it[0]
@@ -206,7 +203,7 @@ object core {
 
         to_fun("throw") {
             throw when(it.size) {
-                0    -> MalUserEx(MalString("error raised anon"))
+                0    -> MalUserEx("error raised anon")
                 else -> MalUserEx(it[0])
             }
         },
@@ -220,7 +217,7 @@ object core {
             val fn     = it[0]     as MalCallable
             val argSeq = it.last() as MalSeq
             val args   = it.atoms.slice(1 .. (if(it.size > 2) it.size - 2 else 0))
-            fn(malListOf(argSeq.atoms + args))
+            fn(malListOf(args + argSeq.atoms))
         },
         to_fun("map") {
             val fn   = it[0] as MalCallable
@@ -272,9 +269,13 @@ object core {
             MalMap(m.pairs - it.tail().atoms.map { it as MalKey })
         },
         to_fun("get") {
-            val m = it[0] as MalMap
+            val m = it[0]
             val k = it[1] as MalKey
-            m[k]
+            when(m) {
+                is MalMap -> m[k]
+                is MalNil -> m
+                else -> throw MalUserEx("Can't treat ${m} as a map")
+            }
         },
         to_fun("contains?") {
             val m = it[0] as MalMap

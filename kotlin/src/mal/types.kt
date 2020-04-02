@@ -90,7 +90,9 @@ class MalUserFunc(
         MalUserFunc(ast, params, env, name, m, func)
 }
 
-data class MalUserEx(val src: MalType) : Exception("Exception raised"), MalType
+data class MalUserEx(val src: MalType) : Exception("Exception raised"), MalType {
+    constructor(msg: String) : this(MalString(msg))
+}
 data class MalCoreEx(val msg: String) : Exception(msg)
 
 // Helper functions.

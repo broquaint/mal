@@ -149,8 +149,7 @@ fun EVAL(cur_ast: MalType, cur_env: Env, depth: Int) : MalType {
                             // The return value from the fn* special form will now become an object/structure with attributes that allow the default invoke case of EVAL to do TCO on mal functions. Those attributes are:
                             val binds = rest[0] as MalSeq
                             val body  = rest[1]
-//                            val func  = malFun("funccall") 
-                            return MalUserFunc(body, binds, env) {
+                            return MalUserFunc(body, binds, env, "anon", MalNil()) {
                                 EVAL(body, Env(env, binds, it), n)
                             }
                         }

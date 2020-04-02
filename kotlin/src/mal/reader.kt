@@ -104,7 +104,7 @@ private fun read_atom(r: Reader, n: Int) : MalType {
 
 private fun make_map(pairs: List<MalType>) : MalMap {
     if(pairs.size % 2 != 0)
-        throw MalUserEx(MalString("maps requires an even number of items, got ${pairs.size} items"))
+        throw MalUserEx("maps requires an even number of items, got ${pairs.size} items")
 
     val map : MutableMap<MalKey, MalType> = mutableMapOf()
     for (idx in pairs.indices step 2) {
