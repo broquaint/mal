@@ -75,7 +75,7 @@ private fun make_string(s: String) =
     if (s.last() == '"')
         MalString(s.dropLast(1).replace(readEscapes) { readEscapeMap.get(it.value) ?: it.value })
     else
-        throw MalCoreEx("Unexpected end of input, unbalanced quote?")
+        throw MalUserEx("Unexpected end of input, unbalanced quote?")
 
 private fun make_with_meta(r: Reader, n: Int): MalType {
     val meta = read_form(r, n)
@@ -143,7 +143,7 @@ fun read_form(r: Reader, n: Int) : MalType {
         }
     }
     catch(e: IndexOutOfBoundsException) {
-        throw MalCoreEx("Unexpected end of input, unbalanced paren/brace/bracket?")
+        throw MalUserEx("Unexpected end of input, unbalanced paren/brace/bracket?")
     }
 }
 

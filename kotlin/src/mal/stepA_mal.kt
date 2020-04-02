@@ -1,14 +1,13 @@
 fun READ(s: String) = read_str(s)
 
-fun eval_ast(ast: MalType, env: Env, depth: Int) : MalType {
-    return when(ast) {
+fun eval_ast(ast: MalType, env: Env, depth: Int) =
+    when(ast) {
         is MalList   -> MalList(ast.atoms.map { EVAL(it, env, depth + 1) }.toList())
         is MalVector -> MalVector(ast.atoms.map { EVAL(it, env, depth + 1) }.toList())
         is MalMap    -> malMapOf(ast.pairs.map { (k,v) -> k to EVAL(v, env, depth + 1) })
         is MalSymbol -> env.get(ast)
         else -> ast
     }
-}
 
 fun make_env(pairs: MalSeq, outer_env: Env, depth: Int) : Env {
     val new_env = Env(outer_env)
@@ -83,8 +82,8 @@ fun EVAL(cur_ast: MalType, cur_env: Env, depth: Int) : MalType {
     eval_loop@ while (true) {
         eval_count++
         // The depth check is low enough so as not to hit a terminal StackOverflow error.
-        // But eval_count is just an arbitrary limit.
-        if (depth > 1012 || eval_count > 654321) {
+        // But eval_count is just an arbitrary limit, high enough for self–hosting tests to pass!
+        if (depth > 1012 || eval_count > 7654321) {
             throw MalCoreEx("Recursion/eval limit hit: depth ${depth} / evalled ${eval_count}!")
         }
 
@@ -262,7 +261,6 @@ fun main(args: Array<String>) {
  (fn* [v]
   (if v false true)))
 )""")
-    rep("")
 
     if(args.size > 0) {
         repl_env.set(malSym("*ARGV*"), malListOf(args.drop(1).map(::MalString)))
@@ -282,7 +280,11 @@ fun main(args: Array<String>) {
                 }
                 println(rep(line))
             }
-            catch(e: Throwable) {
+            catch(e: StackOverflowError) {
+                println("Hit stack overflow at ${e.stackTrace.size}, top 15 frames were:")
+                println(e.stackTrace.take(15).map{ "\t"+it }.joinToString("\n"))
+            }
+            catch(e: Exception) {
                 println(
                     when(e) {
                         is MalUserEx -> "Exception raised: " + pr_str(e.src)
