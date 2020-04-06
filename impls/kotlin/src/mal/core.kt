@@ -1,239 +1,330 @@
-package mal
+private fun int_ops_reducer(f: (Int, Int) -> Int, args: MalSeq): MalNumber =
+    args.atoms.map { v: MalType -> v as MalNumber }
+              .reduce { acc, v -> MalNumber(f(acc.num, v.num)) }
 
-import java.io.File
-import java.util.*
+private fun to_fun(name: String, f: MalFn) : Pair<MalSymbol, MalFunc> =
+    malSym(name) to malFun(name, f)
 
-val ns = hashMapOf(
-        envPair("+", { a: ISeq -> a.seq().reduce({ x, y -> x as MalInteger + y as MalInteger }) }),
-        envPair("-", { a: ISeq -> a.seq().reduce({ x, y -> x as MalInteger - y as MalInteger }) }),
-        envPair("*", { a: ISeq -> a.seq().reduce({ x, y -> x as MalInteger * y as MalInteger }) }),
-        envPair("/", { a: ISeq -> a.seq().reduce({ x, y -> x as MalInteger / y as MalInteger }) }),
+// =: compare the first two parameters and return true if they are the same type and contain the same value.
+private fun is_equal(a: MalType, b: MalType): Boolean =
+    if(a::class == b::class) {
+        when(a) {
+            is MalNumber  -> a.num  == (b as MalNumber).num
+            is MalString  -> a.str  == (b as MalString).str
+            is MalSymbol  -> a.sym  == (b as MalSymbol).sym
+            is MalKeyword -> a.kw   == (b as MalKeyword).kw
+            is MalBoolean -> a.bool == (b as MalBoolean).bool
+            is MalNil     -> true
+            is MalSeq     -> compare_lists(a, (b as MalSeq))
+            is MalMap     -> compare_maps(a, (b as MalMap))
+            is MalFunc    -> a.func == (b as MalFunc).func
+            is MalUserEx  -> is_equal(a.src, (b as MalUserEx).src)
+            else -> throw MalCoreEx("Unknown type $a in is_equal (aka =)")
+        }
+    }
+    // Handle case when comparing lists & vectors.
+    else if (a is MalSeq && b is MalSeq) {
+        compare_lists(a, b)
+    }
+    else {
+        false
+    }
 
-        envPair("list", { a: ISeq -> MalList(a) }),
-        envPair("list?", { a: ISeq -> if (a.first() is MalList) TRUE else FALSE }),
-        envPair("empty?", { a: ISeq -> if (a.first() !is ISeq || !(a.first() as ISeq).seq().any()) TRUE else FALSE }),
-        envPair("count", { a: ISeq ->
-            if (a.first() is ISeq) MalInteger((a.first() as ISeq).count().toLong()) else MalInteger(0)
-        }),
+// In the case of equal length lists, each element of the list should be compared for equality and if they are the same return true, otherwise false.
+private fun compare_lists(a: MalSeq, b: MalSeq): Boolean =
+    a.atoms.count() == b.atoms.count() &&
+    a.atoms.indices.all { is_equal(a[it], b[it]) }
 
-        envPair("=", { a: ISeq -> pairwiseEquals(a) }),
-        envPair("<", { a: ISeq -> pairwiseCompare(a, { x, y -> x.value < y.value }) }),
-        envPair("<=", { a: ISeq -> pairwiseCompare(a, { x, y -> x.value <= y.value }) }),
-        envPair(">", { a: ISeq -> pairwiseCompare(a, { x, y -> x.value > y.value }) }),
-        envPair(">=", { a: ISeq -> pairwiseCompare(a, { x, y -> x.value >= y.value }) }),
+private fun compare_maps(a: MalMap, b: MalMap): Boolean =
+    a.pairs.size == b.pairs.size &&
+    a.pairs.all { (k, v) -> b.pairs.contains(k) && is_equal(v, b[k]) }
 
-        envPair("pr-str", { a: ISeq ->
-            MalString(a.seq().map({ it -> pr_str(it, print_readably = true) }).joinToString(" "))
-        }),
-        envPair("str", { a: ISeq ->
-            MalString(a.seq().map({ it -> pr_str(it, print_readably = false) }).joinToString(""))
-        }),
-        envPair("prn", { a: ISeq ->
-            println(a.seq().map({ it -> pr_str(it, print_readably = true) }).joinToString(" "))
-            NIL
-        }),
-        envPair("println", { a: ISeq ->
-            println(a.seq().map({ it -> pr_str(it, print_readably = false) }).joinToString(" "))
-            NIL
-        }),
+private fun pr_str_core(seq: MalSeq) =
+    seq.atoms.map { pr_str(it, print_readably=true) }.joinToString(" ")
 
-        envPair("read-string", { a: ISeq ->
-            val string = a.first() as? MalString ?: throw MalException("slurp requires a string parameter")
-            read_str(string.value)
-        }),
-        envPair("slurp", { a: ISeq ->
-            val name = a.first() as? MalString ?: throw MalException("slurp requires a filename parameter")
-            val text = File(name.value).readText()
-            MalString(text)
-        }),
+private fun str_core(seq: MalSeq, joiner: String) =
+    seq.atoms.map { pr_str(it, print_readably=false) }.joinToString(joiner)
 
-        envPair("cons", { a: ISeq ->
-            val list = a.nth(1) as? ISeq ?: throw MalException("cons requires a list as its second parameter")
-            val mutableList = list.seq().toCollection(LinkedList<MalType>())
-            mutableList.addFirst(a.nth(0))
-            MalList(mutableList)
-        }),
-        envPair("concat", { a: ISeq -> MalList(a.seq().flatMap({ it -> (it as ISeq).seq() }).toCollection(LinkedList<MalType>())) }),
+private val eof = ""
 
-        envPair("nth", { a: ISeq ->
-            val list = a.nth(0) as? ISeq ?: throw MalException("nth requires a list as its first parameter")
-            val index = a.nth(1) as? MalInteger ?: throw MalException("nth requires an integer as its second parameter")
-            if (index.value >= list.count()) throw MalException("index out of bounds")
-            list.nth(index.value.toInt())
-        }),
-        envPair("first", { a: ISeq ->
-            if (a.nth(0) == NIL) NIL
+object core {
+    val ns : Map<MalSymbol, MalFunc> = mapOf(
+        // Basic number ops.
+        malSym("+") to malFun("plus")  { int_ops_reducer(Int::plus,  it) },
+        malSym("-") to malFun("minus") { int_ops_reducer(Int::minus, it) },
+        malSym("*") to malFun("times") { int_ops_reducer(Int::times, it) },
+        malSym("/") to malFun("div")   { int_ops_reducer(Int::div,   it) },
+
+        // pr-str: calls `pr_str` on each argument with `print_readably` set to true, joins the results with " " and returns the new string.
+        to_fun("pr-str") {
+            MalString(pr_str_core(it))
+        },
+        // `str`: calls `pr_str` on each argument with `print_readably` set to false, concatenates the results together ("" separator), and returns the new string.
+        to_fun("str") {
+            MalString(str_core(it, joiner = ""))
+        },
+        // prn:  calls `pr_str` on each argument with `print_readably` set to true, joins the results with " ", prints the string to the screen and then returns `nil`.
+        to_fun("prn") {
+            println(pr_str_core(it))
+            MalNil()
+        },
+        // `println`:  calls `pr_str` on each argument with `print_readably` set to false, joins the results with " ", prints the string to the screen and then returns `nil`.
+        to_fun("println") {
+            println(str_core(it, joiner = " "))
+            MalNil()
+        },
+
+        // list: take the parameters and return them as a list.
+        to_fun("list") { it }, // we always get a list at this point
+        // list?: return true if the first parameter is a list, false otherwise.
+        to_fun("list?") { MalBoolean(it[0] is MalList) },
+        // empty?: treat the first parameter as a list and return true if the list is empty and false if it contains any elements.
+        to_fun("empty?") { MalBoolean(it[0] is MalSeq && (it[0] as MalSeq).atoms.isEmpty()) },
+        // count: treat the first parameter as a list and return the number of elements that it contains.
+        to_fun("count") {
+            val seq = it[0]
+            MalNumber(if (seq is MalSeq) seq.atoms.count() else 0)
+        },
+
+        // =: see is_equal
+        malSym("=") to malFun("equals?") {
+            val a = it[0]
+            val b = it[1]
+            MalBoolean(is_equal(a, b))
+        },
+        // <, <=, >, and >=: treat the first two parameters as numbers and do the corresponding numeric comparison, returning either true or false.
+        malSym("<") to malFun("lt") {
+            val a = it[0] as MalNumber
+            val b = it[1] as MalNumber
+            MalBoolean(a.num < b.num)
+        },
+        malSym("<=") to malFun("lt-eq") {
+            val a = it[0] as MalNumber
+            val b = it[1] as MalNumber
+            MalBoolean(a.num <= b.num)
+        },
+        malSym(">") to malFun("gt") {
+            val a = it[0] as MalNumber
+            val b = it[1] as MalNumber
+            MalBoolean(a.num > b.num)
+        },
+        malSym(">=") to malFun("gt-eq") {
+            val a = it[0] as MalNumber
+            val b = it[1] as MalNumber
+            MalBoolean(a.num >= b.num)
+        },
+
+        to_fun("read-string") {
+            read_str((it[0] as MalString).str)
+        },
+
+        to_fun("slurp") {
+            MalString(java.io.File((it[0] as MalString).str).readText())
+        },
+
+        to_fun("atom") {
+            MalCljAtom(it[0])
+        },
+        to_fun("atom?") {
+            MalBoolean(it[0] is MalCljAtom)
+        },
+        to_fun("deref") {
+            (it[0] as MalCljAtom).value
+        },
+        to_fun("reset!") {
+            val a = it[0] as MalCljAtom
+            a.value = it[1]
+            a.value
+        },
+        to_fun("swap!") {
+            val atom = it[0] as MalCljAtom
+            val fn   = it[1] as MalCallable
+            // Pull out args if there are any.
+            val args = it.atoms.slice(2 .. (if(it.size > 2) it.size - 1 else 1))
+            // Call the function with atom value + any args.
+            val res  = fn(malListOf(listOf(atom.value) + args))
+            atom.value = res
+            res
+        },
+
+        to_fun("cons") {
+            val rest = if(it.size > 1) it[1] as MalSeq else emptyMalList()
+            malListOf(listOf(it.head()) + rest.atoms)
+        },
+        to_fun("concat") {
+            malListOf(it.atoms.flatMap { (it as MalSeq).atoms })
+        },
+        to_fun("conj") {
+            val seq  = it[0] as MalSeq
+            val rest = it.tail().atoms
+            when(seq) {
+                is MalList   -> malListOf(rest.reversed() + seq.atoms)
+                else         -> MalVector(seq.atoms + rest)
+            }
+        },
+        // takes a list, vector, string, or nil. If an empty list, empty vector, or empty string ("") is passed in then nil is returned. Otherwise, a list is returned unchanged, a vector is converted into a list, and a string is converted to a list that containing the original string split into single character strings.
+        to_fun("seq") {
+            val s = it.head()
+            when(s) {
+                is MalList   -> if(s.size > 0) s else MalNil()
+                is MalVector -> if(s.size > 0) malListOf(s.atoms) else MalNil()
+                is MalString -> if(s.str.count() > 0)
+                                    malListOf(s.str.chunked(1).map(::MalString))
+                                else MalNil()
+                else -> MalNil()
+            }
+        },
+
+        to_fun("nth") {
+            val seq = it[0] as MalSeq
+            val idx = it[1] as MalNumber
+            if (idx.num <= seq.atoms.lastIndex) seq[idx] else throw MalUserEx("the index ${idx} is out of bounds for ${pr_str(seq)}")
+        },
+        to_fun("first") {
+            val v = it[0]
+            if (v is MalNil) {
+                MalNil()
+            }
+            else if (v is MalSeq) {
+                if(v.size == 0) MalNil() else v.head()
+            }
             else {
-                val list = a.nth(0) as? ISeq ?: throw MalException("first requires a list parameter")
-                if (list.seq().any()) list.first() else NIL
+                throw MalCoreEx("Can't fall 'first' on " + pr_str(v))
             }
-        }),
-        envPair("rest", { a: ISeq ->
-            if (a.nth(0) == NIL) MalList()
-            else {
-                val list = a.nth(0) as? ISeq ?: throw MalException("rest requires a list parameter")
-                MalList(list.rest())
+        },
+        to_fun("rest") {
+            val v = it[0]
+            when(v) {
+                is MalSeq -> v.tail()
+                is MalNil -> emptyMalList()
+                else -> throw MalCoreEx("Can't fall 'rest' on " + pr_str(v))
             }
-        }),
+        },
 
-        envPair("throw", { a: ISeq ->
-            val throwable = a.nth(0)
-            throw MalCoreException(pr_str(throwable), throwable)
-        }),
-
-        envPair("apply", { a: ISeq ->
-            val function = a.nth(0) as MalFunction
-            val params = MalList()
-            a.seq().drop(1).forEach({ it ->
-                if (it is ISeq) {
-                    it.seq().forEach({ x -> params.conj_BANG(x) })
-                } else {
-                    params.conj_BANG(it)
-                }
-            })
-            function.apply(params)
-        }),
-
-        envPair("map", { a: ISeq ->
-            val function = a.nth(0) as MalFunction
-            MalList((a.nth(1) as ISeq).seq().map({ it ->
-                val params = MalList()
-                params.conj_BANG(it)
-                function.apply(params)
-            }).toCollection(LinkedList<MalType>()))
-        }),
-
-        envPair("nil?", { a: ISeq -> if (a.nth(0) == NIL) TRUE else FALSE }),
-        envPair("true?", { a: ISeq -> if (a.nth(0) == TRUE) TRUE else FALSE }),
-        envPair("false?", { a: ISeq -> if (a.nth(0) == FALSE) TRUE else FALSE }),
-        envPair("string?", { a: ISeq ->
-            if (a.nth(0) is MalString && !(a.nth(0) is MalKeyword)) TRUE else FALSE
-        }),
-        envPair("symbol?", { a: ISeq -> if (a.nth(0) is MalSymbol) TRUE else FALSE }),
-
-        envPair("symbol", { a: ISeq -> MalSymbol((a.nth(0) as MalString).value) }),
-        envPair("keyword", { a: ISeq ->
-            val param = a.nth(0)
-            if (param is MalKeyword) param else MalKeyword((a.nth(0) as MalString).value)
-        }),
-        envPair("keyword?", { a: ISeq -> if (a.nth(0) is MalKeyword) TRUE else FALSE }),
-        envPair("number?", { a: ISeq -> if (a.nth(0) is MalInteger) TRUE else FALSE }),
-        envPair("fn?", { a: ISeq -> if ((a.nth(0) as? MalFunction)?.is_macro ?: true) FALSE else TRUE }),
-        envPair("macro?", { a: ISeq -> if ((a.nth(0) as? MalFunction)?.is_macro ?: false) TRUE else FALSE }),
-
-        envPair("vector", { a: ISeq -> MalVector(a) }),
-        envPair("vector?", { a: ISeq -> if (a.nth(0) is MalVector) TRUE else FALSE }),
-
-        envPair("hash-map", { a: ISeq ->
-            val map = MalHashMap()
-            pairwise(a).forEach({ it -> map.assoc_BANG(it.first as MalString, it.second) })
-            map
-        }),
-        envPair("map?", { a: ISeq -> if (a.nth(0) is MalHashMap) TRUE else FALSE }),
-        envPair("assoc", { a: ISeq ->
-            val map = MalHashMap(a.first() as MalHashMap)
-            pairwise(a.rest()).forEach({ it -> map.assoc_BANG(it.first as MalString, it.second) })
-            map
-        }),
-        envPair("dissoc", { a: ISeq ->
-            val map = MalHashMap(a.first() as MalHashMap)
-            a.rest().seq().forEach({ it -> map.dissoc_BANG(it as MalString) })
-            map
-        }),
-        envPair("get", { a: ISeq ->
-            val map = a.nth(0) as? MalHashMap
-            val key = a.nth(1) as MalString
-            map?.elements?.get(key) ?: NIL
-        }),
-        envPair("contains?", { a: ISeq ->
-            val map = a.nth(0) as? MalHashMap
-            val key = a.nth(1) as MalString
-            if (map?.elements?.get(key) != null) TRUE else FALSE
-        }),
-        envPair("keys", { a: ISeq ->
-            val map = a.nth(0) as MalHashMap
-            MalList(map.elements.keys.toCollection(LinkedList<MalType>()))
-        }),
-        envPair("vals", { a: ISeq ->
-            val map = a.nth(0) as MalHashMap
-            MalList(map.elements.values.toCollection(LinkedList<MalType>()))
-        }),
-        envPair("count", { a: ISeq ->
-            val seq = a.nth(0) as? ISeq
-            if (seq != null) MalInteger(seq.count().toLong()) else ZERO
-        }),
-        envPair("sequential?", { a: ISeq -> if (a.nth(0) is ISeq) TRUE else FALSE }),
-
-        envPair("with-meta", { a: ISeq ->
-            val obj = a.nth(0)
-            val metadata = a.nth(1)
-            obj.with_meta(metadata)
-        }),
-        envPair("meta", { a: ISeq -> a.first().metadata }),
-
-        envPair("conj", { a: ISeq -> (a.first() as ISeq).conj(a.rest()) }),
-        envPair("seq", { a: ISeq ->
-            val obj = a.nth(0)
-            if (obj is ISeq) {
-                if (obj.count() == 0) NIL
-                else MalList(obj.seq().toCollection(LinkedList<MalType>()))
-            } else if (obj is MalString && !(obj is MalKeyword)) {
-                if (obj.value.length == 0) NIL
-                else {
-                    var strs = obj.value.map({ c -> MalString(c.toString()) })
-                    MalList(strs.toCollection(LinkedList<MalType>()))
-                }
-            } else {
-                NIL
+        to_fun("throw") {
+            throw when(it.size) {
+                0    -> MalUserEx("error raised anon")
+                else -> MalUserEx(it[0])
             }
-        }),
+        },
 
-        envPair("atom", { a: ISeq -> MalAtom(a.first()) }),
-        envPair("atom?", { a: ISeq -> if (a.first() is MalAtom) TRUE else FALSE }),
-        envPair("deref", { a: ISeq -> (a.first() as MalAtom).value }),
-        envPair("reset!", { a: ISeq ->
-            val atom = a.nth(0) as MalAtom
-            val value = a.nth(1)
-            atom.value = value
-            value
-        }),
-        envPair("swap!", { a: ISeq ->
-            val atom = a.nth(0) as MalAtom
-            val function = a.nth(1) as MalFunction
+        to_fun("apply") {
+            // The first argument is a function and the last argument
+            // is list (or vector). The arguments between the function
+            // and the last argument (if there are any) are
+            // concatenated with the final argument to create the
+            // arguments that are used to call the function.
+            val fn     = it[0]     as MalCallable
+            val argSeq = it.last() as MalSeq
+            val args   = it.atoms.slice(1 .. (if(it.size > 2) it.size - 2 else 0))
+            fn(malListOf(args + argSeq.atoms))
+        },
+        to_fun("map") {
+            val fn   = it[0] as MalCallable
+            val args = it[1] as MalSeq
+            malListOf(args.atoms.map { fn(malListOf(it)) })
+        },
 
-            val params = MalList()
-            params.conj_BANG(atom.value)
-            a.seq().drop(2).forEach({ it -> params.conj_BANG(it) })
+        to_fun("nil?") {
+            MalBoolean(it[0] is MalNil)
+        },
+        to_fun("true?") {
+            MalBoolean(it[0] == MalBoolean(true))
+        },
+        to_fun("false?") {
+            MalBoolean(it[0] == MalBoolean(false))
+        },
+        to_fun("symbol?") {
+            MalBoolean(it[0] is MalSymbol)
+        },
 
-            val value = function.apply(params)
-            atom.value = value
-
-            value
-        }),
-
-        envPair("readline", { a: ISeq ->
-            val prompt = a.first() as MalString
-            try {
-                MalString(readline(prompt.value))
-            } catch (e: java.io.IOException) {
-                throw MalException(e.message)
-            } catch (e: EofException) {
-                NIL
+        to_fun("symbol") {
+            MalSymbol((it[0] as MalString).str)
+        },
+        to_fun("keyword") {
+            val kw = it[0]
+            if (kw is MalKeyword) kw else MalKeyword((kw as MalString).str)
+        },
+        to_fun("keyword?") {
+            MalBoolean(it[0] is MalKeyword)
+        },
+        to_fun("vector") {
+            MalVector(it.atoms)
+        },
+        to_fun("vector?") {
+            MalBoolean(it[0] is MalVector)
+        },
+        to_fun("hash-map") {
+            make_map(it)
+        },
+        to_fun("map?") {
+            MalBoolean(it[0] is MalMap)
+        },
+        to_fun("assoc") {
+            val m = it[0] as MalMap
+            MalMap(m.pairs + make_map(it.tail()).pairs)
+        },
+        to_fun("dissoc") {
+            val m = it[0] as MalMap
+            MalMap(m.pairs - it.tail().atoms.map { it as MalKey })
+        },
+        to_fun("get") {
+            val m = it[0]
+            val k = it[1] as MalKey
+            when(m) {
+                is MalMap -> m[k]
+                is MalNil -> m
+                else -> throw MalUserEx("Can't treat ${m} as a map")
             }
-        }),
+        },
+        to_fun("contains?") {
+            val m = it[0] as MalMap
+            MalBoolean(m.pairs.contains(it[1]))
+        },
+        to_fun("keys") {
+            val m = it[0] as MalMap
+            malListOf(m.pairs.keys.toList())
+        },
+        to_fun("vals") {
+            val m = it[0] as MalMap
+            malListOf(m.pairs.values.toList())
+        },
+        to_fun("sequential?") {
+            MalBoolean(it[0] is MalSeq)
+        },
 
-        envPair("time-ms", { a: ISeq -> MalInteger(System.currentTimeMillis()) })
-)
+        to_fun("readline") {
+            print((it[0] as MalString).str)
+            val line = readLine()
+            if (line == null) MalNil() else MalString(line.trim())
+        },
 
-private fun envPair(k: String, v: (ISeq) -> MalType): Pair<MalSymbol, MalType> = Pair(MalSymbol(k), MalFunction(v))
+        to_fun("meta") {
+            val f = it[0] as MalMeta
+            f.meta
+        },
+        to_fun("with-meta") {
+            val f = it[0] as MalMeta
+            f.withMeta(it[1])
+        },
 
-private fun pairwise(s: ISeq): List<Pair<MalType, MalType>> {
-    val (keys, vals) = s.seq().withIndex().partition({ it -> it.index % 2 == 0 })
-    return keys.map({ it -> it.value }).zip(vals.map({ it -> it.value }))
+        to_fun("time-ms") {
+            MalNumber(java.time.Instant.now().toEpochMilli().toInt())
+        },
+
+        to_fun("string?") {
+            MalBoolean(it[0] is MalString)
+        },
+        to_fun("number?") {
+            MalBoolean(it[0] is MalNumber)
+        },
+        to_fun("fn?") {
+            val f = it[0]
+            MalBoolean(f is MalCallable && !f.isMacro)
+        },
+        to_fun("macro?") {
+            val f = it[0]
+            MalBoolean(f is MalCallable && f.isMacro)
+        }
+    )
 }
-
-private fun pairwiseCompare(s: ISeq, pred: (MalInteger, MalInteger) -> Boolean): MalConstant =
-        if (pairwise(s).all({ it -> pred(it.first as MalInteger, it.second as MalInteger) })) TRUE else FALSE
-
-private fun pairwiseEquals(s: ISeq): MalConstant =
-        if (pairwise(s).all({ it -> it.first == it.second })) TRUE else FALSE

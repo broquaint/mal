@@ -1,45 +1,81 @@
-package mal
+fun READ(s: String) = read_str(s)
 
-fun read(input: String?): MalType = read_str(input)
+val repl_env : Map<String, MalFunc> = mapOf(
+        "+" to malFun("+") { MalNumber((it[0] as MalNumber).num + (it[1] as MalNumber).num) },
+        "-" to malFun("-") { MalNumber((it[0] as MalNumber).num - (it[1] as MalNumber).num) },
+        "*" to malFun("*") { MalNumber((it[0] as MalNumber).num * (it[1] as MalNumber).num) },
+        "/" to malFun("/") { MalNumber((it[0] as MalNumber).num / (it[1] as MalNumber).num) }
+)
 
-fun eval(ast: MalType, env: Map<String, MalType>): MalType =
-        if (ast is MalList && ast.count() > 0) {
-            val evaluated = eval_ast(ast, env) as ISeq
-            if (evaluated.first() !is MalFunction) throw MalException("cannot execute non-function")
-            (evaluated.first() as MalFunction).apply(evaluated.rest())
-        } else eval_ast(ast, env)
+// Create a new function eval_ast which takes ast (mal data type) and
+// an associative structure (the environment from above). eval_ast
+// switches on the type of ast as follows:
+// 
+//  * symbol: lookup the symbol in the environment structure and return the value or raise an error if no value is found
+//  * list: return a new list that is the result of calling EVAL on each of the members of the list
+//  * otherwise just return the original ast value
 
-fun eval_ast(ast: MalType, env: Map<String, MalType>): MalType =
-        when (ast) {
-            is MalSymbol -> env[ast.value] ?: throw MalException("'${ast.value}' not found")
-            is MalList -> ast.elements.fold(MalList(), { a, b -> a.conj_BANG(eval(b, env)); a })
-            is MalVector -> ast.elements.fold(MalVector(), { a, b -> a.conj_BANG(eval(b, env)); a })
-            is MalHashMap -> ast.elements.entries.fold(MalHashMap(), { a, b -> a.assoc_BANG(b.key, eval(b.value, env)); a })
-            else -> ast
+fun eval_ast(ast: MalType, env: Map<String, MalFunc>, depth: Int) : MalType {
+//    print("eval_ast: ".repeat(depth))
+//    println(PRINT(ast))
+    return when(ast) {
+        is MalList   -> MalList(ast.atoms.map { EVAL(it, env, depth) }.toList())
+        is MalVector -> MalVector(ast.atoms.map { EVAL(it, env, depth + 1) }.toList())
+        is MalMap    -> malMapOf(ast.pairs.map { (k,v) -> k to EVAL(v, env, depth + 1) })
+        is MalSymbol -> env[ast.sym] ?: throw Exception("Unknown symbol '${ast.sym}'")
+        else -> ast
+    }
+}
+
+// Modify EVAL to check if the first parameter ast is a list.
+// * ast is not a list: then return the result of calling eval_ast on it.
+// * ast is a empty list: return ast unchanged.
+// * ast is a list: call eval_ast to get a new evaluated list. Take the first
+//   item of the evaluated list and call it as function using the rest of the
+//   evaluated list as its arguments.
+
+var eval_count = 0
+fun EVAL(ast: MalType, env: Map<String, MalFunc>, depth: Int) : MalType {
+//    print("EVAL____: ".repeat(depth))
+//    println(PRINT(ast))
+
+    eval_count += 1
+    if (depth > 200 || eval_count > 500) {
+        throw Exception("Recursion fail :(")
+    }
+
+    if (ast !is MalList) {
+        return eval_ast(ast, env, depth)
+    }
+    else {
+        if (ast.atoms.isEmpty()) {
+            return ast
         }
-
-fun print(result: MalType) = pr_str(result, print_readably = true)
-
-fun main(args: Array<String>) {
-    val env = hashMapOf(
-            Pair("+", MalFunction({ a: ISeq -> a.seq().reduce({ x, y -> x as MalInteger + y as MalInteger }) })),
-            Pair("-", MalFunction({ a: ISeq -> a.seq().reduce({ x, y -> x as MalInteger - y as MalInteger }) })),
-            Pair("*", MalFunction({ a: ISeq -> a.seq().reduce({ x, y -> x as MalInteger * y as MalInteger }) })),
-            Pair("/", MalFunction({ a: ISeq -> a.seq().reduce({ x, y -> x as MalInteger / y as MalInteger }) }))
-    )
-
-    while (true) {
-        val input = readline("user> ")
-
-        try {
-            println(print(eval(read(input), env)))
-        } catch (e: EofException) {
-            break
-        } catch (e: MalContinue) {
-        } catch (e: MalException) {
-            println("Error: " + e.message)
-        } catch (t: Throwable) {
-            println("Uncaught " + t + ": " + t.message)
+        else {
+            val l = eval_ast(ast, env, depth + 1)
+            val f = ((l as MalList).head() as MalFunc)
+            return f(l.tail())
         }
     }
 }
+
+fun PRINT(v: MalType) = pr_str(v)
+
+fun rep(s: String) {
+    println(PRINT(EVAL(READ(s), repl_env, 0)))
+}
+
+fun main(args: Array<String>) {
+    while(true) {
+        print("user> ")
+
+        try {
+            readLine()?.let { rep(it) }
+        }
+        catch(e: Exception) {
+            println("Oh dear:" + e.toString())
+        }
+    }
+}
+
+
