@@ -1,22 +1,23 @@
-package mal
+fun READ(s: String) = read_str(s)
+
+fun EVAL(s: MalType) = s
+
+fun PRINT(v: MalType) = pr_str(v)
+
+fun rep(s: String) {
+    println(PRINT(EVAL(READ(s))))
+}
 
 fun main(args: Array<String>) {
-    fun read(input: String?): MalType = read_str(input)
-    fun eval(expression: MalType): MalType = expression
-    fun print(result: MalType) = pr_str(result, print_readably = true)
-
-    while (true) {
-        val input = readline("user> ")
+    while(true) {
+        print("user> ")
 
         try {
-            println(print(eval(read(input))))
-        } catch (e: EofException) {
-            break
-        } catch (e: MalContinue) {
-        } catch (e: MalException) {
-            println("Error: " + e.message)
-        } catch (t: Throwable) {
-            println("Uncaught " + t + ": " + t.message)
+            readLine()?.let { rep(it) }
+        }
+        catch(e: Exception) {
+            println("Oh dear:" + e.toString())
         }
     }
 }
+

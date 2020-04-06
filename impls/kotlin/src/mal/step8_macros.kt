@@ -1,179 +1,237 @@
-package mal
+fun READ(s: String) = read_str(s)
 
-import java.util.*
-
-fun read(input: String?): MalType = read_str(input)
-
-fun eval(_ast: MalType, _env: Env): MalType {
-    var ast = _ast
-    var env = _env
-
-    while (true) {
-        ast = macroexpand(ast, env)
-
-        if (ast is MalList) {
-            if (ast.count() == 0) return ast
-            when ((ast.first() as? MalSymbol)?.value) {
-                "def!" -> return env.set(ast.nth(1) as MalSymbol, eval(ast.nth(2), env))
-                "let*" -> {
-                    val childEnv = Env(env)
-                    val bindings = ast.nth(1) as? ISeq ?: throw MalException("expected sequence as the first parameter to let*")
-
-                    val it = bindings.seq().iterator()
-                    while (it.hasNext()) {
-                        val key = it.next()
-                        if (!it.hasNext()) throw MalException("odd number of binding elements in let*")
-                        childEnv.set(key as MalSymbol, eval(it.next(), childEnv))
-                    }
-
-                    env = childEnv
-                    ast = ast.nth(2)
-                }
-                "fn*" -> return fn_STAR(ast, env)
-                "do" -> {
-                    eval_ast(ast.slice(1, ast.count() - 1), env)
-                    ast = ast.seq().last()
-                }
-                "if" -> {
-                    val check = eval(ast.nth(1), env)
-
-                    if (check !== NIL && check !== FALSE) {
-                        ast = ast.nth(2)
-                    } else if (ast.count() > 3) {
-                        ast = ast.nth(3)
-                    } else return NIL
-                }
-                "quote" -> return ast.nth(1)
-                "quasiquote" -> ast = quasiquote(ast.nth(1))
-                "defmacro!" -> return defmacro(ast, env)
-                "macroexpand" -> return macroexpand(ast.nth(1), env)
-                else -> {
-                    val evaluated = eval_ast(ast, env) as ISeq
-                    val firstEval = evaluated.first()
-
-                    when (firstEval) {
-                        is MalFnFunction -> {
-                            ast = firstEval.ast
-                            env = Env(firstEval.env, firstEval.params, evaluated.rest().seq())
-                        }
-                        is MalFunction -> return firstEval.apply(evaluated.rest())
-                        else -> throw MalException("cannot execute non-function")
-                    }
-                }
-            }
-        } else return eval_ast(ast, env)
+fun eval_ast(ast: MalType, env: Env, depth: Int) : MalType {
+    return when(ast) {
+        is MalList   -> MalList(ast.atoms.map { EVAL(it, env, depth + 1) }.toList())
+        is MalVector -> MalVector(ast.atoms.map { EVAL(it, env, depth + 1) }.toList())
+        is MalMap    -> malMapOf(ast.pairs.map { (k,v) -> k to EVAL(v, env, depth + 1) })
+        is MalSymbol -> env.get(ast)
+        else -> ast
     }
 }
 
-fun eval_ast(ast: MalType, env: Env): MalType =
-        when (ast) {
-            is MalSymbol -> env.get(ast)
-            is MalList -> ast.elements.fold(MalList(), { a, b -> a.conj_BANG(eval(b, env)); a })
-            is MalVector -> ast.elements.fold(MalVector(), { a, b -> a.conj_BANG(eval(b, env)); a })
-            is MalHashMap -> ast.elements.entries.fold(MalHashMap(), { a, b -> a.assoc_BANG(b.key, eval(b.value, env)); a })
-            else -> ast
-        }
-
-private fun fn_STAR(ast: MalList, env: Env): MalType {
-    val binds = ast.nth(1) as? ISeq ?: throw MalException("fn* requires a binding list as first parameter")
-    val params = binds.seq().filterIsInstance<MalSymbol>()
-    val body = ast.nth(2)
-
-    return MalFnFunction(body, params, env, { s: ISeq -> eval(body, Env(env, params, s.seq())) })
+fun make_env(pairs: MalSeq, outer_env: Env, depth: Int) : Env {
+    val new_env = Env(outer_env)
+    for (idx in pairs.atoms.indices step 2) {
+        val k = pairs.atoms[idx] as MalSymbol
+        val v = pairs.atoms[idx + 1]
+        new_env.set(k, EVAL(v, new_env, depth + 1))
+    }
+    return new_env
 }
 
-private fun is_pair(ast: MalType): Boolean = ast is ISeq && ast.seq().any()
-
-private fun quasiquote(ast: MalType): MalType {
-    if (!is_pair(ast)) {
-        val quoted = MalList()
-        quoted.conj_BANG(MalSymbol("quote"))
-        quoted.conj_BANG(ast)
-        return quoted
+fun is_true(cond: MalType) =
+    when (cond) {
+        is MalNil -> false
+        is MalBoolean -> cond.bool
+        else -> true
     }
 
-    val seq = ast as ISeq
-    var first = seq.first()
+// Not implemented as safe-casing is gooder.
+// fun is_pair(p: MalType) = p is MalList && p.size > 0
 
-    if ((first as? MalSymbol)?.value == "unquote") {
-        return seq.nth(1)
+fun quasiquote(ast: MalType) : MalType {
+    return if (ast is MalList && ast.size > 0) {
+        val fst  = ast.head()
+        val rest = ast.tail()
+        if (fst == malSym("unquote"))
+            rest.head()
+        else if (fst is MalList && fst.head() == malSym("splice-unquote"))
+            malListOf(malSym("concat"), fst.tail().head(), quasiquote(rest))
+        else
+            malListOf(malSym("cons"), quasiquote(fst), quasiquote(rest))
     }
-
-    if (is_pair(first) && ((first as ISeq).first() as? MalSymbol)?.value == "splice-unquote") {
-        val spliced = MalList()
-        spliced.conj_BANG(MalSymbol("concat"))
-        spliced.conj_BANG(first.nth(1))
-        spliced.conj_BANG(quasiquote(MalList(seq.seq().drop(1).toCollection(LinkedList<MalType>()))))
-        return spliced
+    else {
+        malListOf(malSym("quote"), ast)
     }
-
-    val consed = MalList()
-    consed.conj_BANG(MalSymbol("cons"))
-    consed.conj_BANG(quasiquote(ast.first()))
-    consed.conj_BANG(quasiquote(MalList(seq.seq().drop(1).toCollection(LinkedList<MalType>()))))
-    return consed
 }
 
-private fun is_macro_call(ast: MalType, env: Env): Boolean {
-    val ast_list = ast as? MalList ?: return false
-    if (ast_list.count() == 0) return false
-    val symbol = ast_list.first() as? MalSymbol ?: return false
-    val function = env.find(symbol) as? MalFunction ?: return false
-
-    return function.is_macro
+fun is_macro_call(ast: MalType, env: Env) : Boolean {
+    if(ast is MalList && ast[0] is MalSymbol) {
+        val sym = ast[0] as MalSymbol
+        val e   = env.find(sym) ?: return false
+        val v   = e.get(sym)
+        return v is MalCallable && v.isMacro
+    }
+    else {
+        return false
+    }
 }
 
-private fun macroexpand(_ast: MalType, env: Env): MalType {
-    var ast = _ast
-    while (is_macro_call(ast, env)) {
-        val symbol = (ast as MalList).first() as MalSymbol
-        val function = env.find(symbol) as MalFunction
-        ast = function.apply(ast.rest())
+fun macroexpand(orig_ast: MalType, env: Env) : MalType {
+    var ast = orig_ast
+    while(is_macro_call(ast, env)) {
+        val l = ast as MalList
+        //  Inside the loop, the first element of the ast list (a symbol), is looked up in the environment to get the macro function
+        val f = env.get(l.head() as MalSymbol) as MalUserFunc
+        // This macro function is then called/applied with the rest of the ast elements (2nd through the last) as arguments.
+        // The return value of the macro call becomes the new value of ast.
+        ast = f(l.tail())
     }
     return ast
 }
 
-private fun defmacro(ast: MalList, env: Env): MalType {
-    val macro = eval(ast.nth(2), env) as MalFunction
-    macro.is_macro = true
+var eval_count = 0
+fun EVAL(cur_ast: MalType, cur_env: Env, depth: Int) : MalType {
+//    val say = { m: String -> println(" ".repeat(depth) + m) }
+    // Only use n when recursing into EVAL
+    val n = depth + 1
+    // Allow modification of where in the ast is being evaluated.
+    var ast = cur_ast
+    // Allow modification of which env is pointed at while evaluating.
+    var env = cur_env
+    eval_loop@ while (true) {
+        eval_count++
+        // The depth check is low enough so as not to hit a terminal StackOverflow error.
+        // But eval_count is just an arbitrary limit.
+        if (depth > 1012 || eval_count > 654321) {
+            throw Exception("Recursion/eval limit hit: depth ${depth} / evalled ${eval_count}!")
+        }
 
-    return env.set(ast.nth(1) as MalSymbol, macro)
-}
+        ast = macroexpand(ast, env)
 
-fun print(result: MalType) = pr_str(result, print_readably = true)
+        if (ast !is MalList) {
+            return eval_ast(ast, env, depth)
+        }
+        else {
+            if (ast.atoms.isEmpty()) {
+                return ast
+            }
+            else {
+                val next = ast.head()
+                val rest = ast.tail()
+                if(next is MalSymbol) {
+                    when(next.sym) {
+                        "def!" -> {
+                            val v    = EVAL(rest[1], env, n)
+                            val name = (rest[0] as MalSymbol)
+                            if (v is MalUserFunc) {
+                                v.name = name.sym
+                            }
+                            return env.set(name, v)
+                        }
+                        "defmacro!" -> {
+                            val v = EVAL(rest[1], env, n)
+                            if (v !is MalUserFunc) {
+                                throw Exception("Can't defmacro! with a: "+pr_str(v))
+                            }
+                            else {
+                                v.isMacro = true
+                            }
+                            val name = (rest[0] as MalSymbol)
+                            return env.set(name, v)
+                            
+                        }
+                        "macroexpand" -> {
+                            return macroexpand(rest[0], env)
+                        }
+                        "let*" -> {
+                            // Set env (i.e. the local variable passed in as second parameter of EVAL) to the new let environment. 
+                            env = make_env((rest[0] as MalSeq), env, depth)
+                            //  Set ast (i.e. the local variable passed in as first parameter of EVAL) to be the second ast argument.
+                            ast = ast[2]
+                            continue@eval_loop // TCO
+                        }
+                        "do" -> {
+                            // change the eval_ast call to evaluate all the parameters except for the last (2nd list element up to but not including last).
+                            eval_ast(rest.butlast(), env, depth)
+                            // Set ast to the last element of ast. Continue at the beginning of the loop (env stays unchanged).
+                            ast = rest.last()
+                            continue@eval_loop // TCO
+                        }
+                        "if" -> {
+                            // the condition continues to be evaluated, however, rather than evaluating the true or false branch, ast is set to the unevaluated value of the chosen branch.
+                            ast = if(is_true(EVAL(rest[0], env, n))) rest[1] else
+                                  if(rest.atoms.count() == 3)        rest[2] else MalNil()
+                            continue@eval_loop // TCO
+                        }
+                        "fn*" -> {
+                            // The return value from the fn* special form will now become an object/structure with attributes that allow the default invoke case of EVAL to do TCO on mal functions. Those attributes are:
+                            val binds = rest[0] as MalSeq
+                            val body  = rest[1]
+                            return MalUserFunc(body, binds, env, "anon", MalNil()) {
+                                EVAL(body, Env(env, binds, it), n)
+                            }
+                        }
+                        "quote" -> {
+                            return rest.head()
+                        }
+                        // This is called from `EVAL` with the first `ast` argument (second list element) and then `ast` is set to the result and execution continues at the top of the loop (TCO).
+                        "quasiquote" -> {
+                            // TODO TCO
+                            // XXX Support >1 args?
+                            ast = quasiquote(rest[0])
+                            continue@eval_loop // TCO
+                        }
+                    }
+                }
 
-fun rep(input: String, env: Env): String =
-        print(eval(read(input), env))
+                val op   = eval_ast(ast, env, depth) as MalList
+                val func = op.head()
+                val args = op.tail()
 
-fun main(args: Array<String>) {
-    val repl_env = Env()
-    ns.forEach({ it -> repl_env.set(it.key, it.value) })
-
-    repl_env.set(MalSymbol("*ARGV*"), MalList(args.drop(1).map({ it -> MalString(it) }).toCollection(LinkedList<MalType>())))
-    repl_env.set(MalSymbol("eval"), MalFunction({ a: ISeq -> eval(a.first(), repl_env) }))
-
-    rep("(def! not (fn* (a) (if a false true)))", repl_env)
-    rep("(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\nnil)\")))))", repl_env)
-    rep("(defmacro! cond (fn* (& xs) (if (> (count xs) 0) (list 'if (first xs) (if (> (count xs) 1) (nth xs 1) (throw \"odd number of forms to cond\")) (cons 'cond (rest (rest xs)))))))", repl_env)
-
-    if (args.any()) {
-        rep("(load-file \"${args[0]}\")", repl_env)
-        return
-    }
-
-    while (true) {
-        val input = readline("user> ")
-
-        try {
-            println(rep(input, repl_env))
-        } catch (e: EofException) {
-            break
-        } catch (e: MalContinue) {
-        } catch (e: MalException) {
-            println("Error: " + e.message)
-        } catch (t: Throwable) {
-            println("Uncaught " + t + ": " + t.message)
-            t.printStackTrace()
+                if(func is MalUserFunc) {
+                    ast = func.ast
+                    env = Env(func.env, func.params, args)
+                    continue@eval_loop // TCO
+                }
+                else if(func is MalFunc) {
+                    return func(args)
+                }
+                else {
+                    return func
+//                    throw Exception("Don't know what to do with " + func)
+                }
+            }
         }
     }
 }
+
+fun PRINT(v: MalType) = pr_str(v)
+
+fun rep(s: String) = PRINT(EVAL(READ(s), repl_env, 0))
+
+val repl_env = Env().apply {
+    core.ns.forEach { (k,v) -> set(k, v) }
+}
+
+fun main(args: Array<String>) {
+    repl_env.set(malSym("eval"), malFun("eval") {
+        val res = eval_ast(it, repl_env, 0)
+        when(res) {
+            is MalList -> res.last()
+            else       -> res
+        }
+    })
+
+    rep("""(def! load-file (fn* [f] (eval (read-string (str "(do " (slurp f) ")")))))""")
+    rep("""(defmacro! cond (fn* (& xs) (if (> (count xs) 0) (list 'if (first xs) (if (> (count xs) 1) (nth xs 1) (throw "odd number of forms to cond")) (cons 'cond (rest (rest xs)))))))""")
+    rep("""(defmacro! or (fn* (& xs) (if (empty? xs) nil (if (= 1 (count xs)) (first xs) `(let* (or_FIXME ~(first xs)) (if or_FIXME or_FIXME (or ~@(rest xs))))))))""")
+    rep("(def! not (fn* [v] (if v false true)))")
+
+    if(args.size > 0) {
+        repl_env.set(malSym("*ARGV*"), malListOf(args.drop(1).map(::MalString)))
+        rep("""(load-file "${args[0]}")""")
+    }
+    else {
+        repl_env.set(malSym("*ARGV*"), emptyMalList())
+        repl@ while(true) {
+            print("user> ")
+
+            try {
+                val line = readLine() ?: continue@repl
+                if (setOf("quit","exit").contains(line.trim())) {
+                    println("Bye!")
+                    break@repl
+                }
+                println(rep(line))
+            }
+            catch(e: Exception) {
+                println("Oh dear:" + e.toString())
+                e.printStackTrace()
+                eval_count = 0
+            }
+        }
+    }
+}
+

@@ -1,103 +1,121 @@
-package mal
+fun READ(s: String) = read_str(s)
 
-fun read(input: String?): MalType = read_str(input)
+// Create a new function eval_ast which takes ast (mal data type) and
+// an associative structure (the environment from above). eval_ast
+// switches on the type of ast as follows:
+// 
+//  * symbol: lookup the symbol in the environment structure and return the value or raise an error if no value is found
+//  * list: return a new list that is the result of calling EVAL on each of the members of the list
+//  * otherwise just return the original ast value
 
-fun eval(ast: MalType, env: Env): MalType =
-    if (ast is MalList && ast.count() > 0) {
-        val first = ast.first()
-        if (first is MalSymbol) {
-            when (first.value) {
-                "def!" -> eval_def_BANG(ast, env)
-                "let*" -> eval_let_STAR(ast, env)
-                "fn*"  -> eval_fn_STAR(ast, env)
-                "do"   -> eval_do(ast, env)
-                "if"   -> eval_if(ast, env)
-                else   -> eval_function_call(ast, env)
-            }
-        } else eval_function_call(ast, env)
-    } else eval_ast(ast, env)
+fun eval_ast(ast: MalType, env: Env, depth: Int) : MalType {
+//    print("eval_ast: ".repeat(depth))
+//    println(PRINT(ast))
+    return when(ast) {
+        is MalList   -> MalList(ast.atoms.map { EVAL(it, env, depth + 1) }.toList())
+        is MalVector -> MalVector(ast.atoms.map { EVAL(it, env, depth + 1) }.toList())
+        is MalMap    -> malMapOf(ast.pairs.map { (k,v) -> k to EVAL(v, env, depth + 1) })
+        is MalSymbol -> env.get(ast)
+        else -> ast
+    }
+}
 
-private fun eval_def_BANG(ast: ISeq, env: Env): MalType =
-        env.set(ast.nth(1) as MalSymbol, eval(ast.nth(2), env))
+/*
 
-private fun eval_let_STAR(ast: ISeq, env: Env): MalType {
-    val child = Env(env)
-    val bindings = ast.nth(1) as? ISeq ?: throw MalException("expected sequence as the first parameter to let*")
+    do: Evaluate all the elements of the list using eval_ast and return the final evaluated element.
+    if: Evaluate the first parameter (second element). If the result (condition) is anything other than nil or false, then evaluate the second parameter (third element of the list) and return the result. Otherwise, evaluate the third parameter (fourth element) and return the result. If condition is false and there is no third parameter, then just return nil.
+    fn*: Return a new function closure. The body of that closure does the following:
+        Create a new environment using env (closed over from outer scope) as the outer parameter, the first parameter (second list element of ast from the outer scope) as the binds parameter, and the parameters to the closure as the exprs parameter.
+        Call EVAL on the second parameter (third list element of ast from outer scope), using the new environment. Use the result as the return value of the closure.
 
-    val it = bindings.seq().iterator()
-    while (it.hasNext()) {
-        val key = it.next()
-        if (!it.hasNext()) throw MalException("odd number of binding elements in let*")
+*/
 
-        val value = eval(it.next(), child)
-        child.set(key as MalSymbol, value)
+fun make_env(pairs: MalSeq, outer_env: Env, depth: Int) : Env {
+    val new_env = Env(outer_env)
+    for (idx in pairs.atoms.indices step 2) {
+        val k = pairs.atoms[idx] as MalSymbol
+        val v = pairs.atoms[idx + 1]
+        new_env.set(k, EVAL(v, new_env, depth + 1))
+    }
+    return new_env
+}
+
+fun is_true(cond : MalType) =
+    when(cond) {
+        is MalNil -> false
+        is MalBoolean -> cond.bool
+        else -> true
     }
 
-    return eval(ast.nth(2), child)
-}
+var eval_count = 0
+fun EVAL(ast: MalType, env: Env, depth: Int) : MalType {
+//    print("EVAL____: ".repeat(depth))
+//    println(PRINT(ast))
 
-private fun eval_fn_STAR(ast: ISeq, env: Env): MalType {
-    val binds = ast.nth(1) as? ISeq ?: throw MalException("fn* requires a binding list as first parameter")
-    val symbols = binds.seq().filterIsInstance<MalSymbol>()
-    val body = ast.nth(2)
+    // Only use n when recursing into EVAL
+    val n = depth + 1
+    eval_count += 1
+    if (depth > 10000 || eval_count > 50000) {
+        throw Exception("Recursion fail :(")
+    }
 
-    return MalFunction({ s: ISeq ->
-        eval(body, Env(env, symbols, s.seq()))
-    })
-}
-
-private fun eval_do(ast: ISeq, env: Env): MalType =
-        (eval_ast(MalList(ast.rest()), env) as ISeq).seq().last()
-
-private fun eval_if(ast: ISeq, env: Env): MalType {
-    val check = eval(ast.nth(1), env)
-
-    return if (check != NIL && check != FALSE) {
-        eval(ast.nth(2), env)
-    } else if (ast.count() > 3) {
-        eval(ast.nth(3), env)
-    } else NIL
-}
-
-private fun eval_function_call(ast: ISeq, env: Env): MalType {
-    val evaluated = eval_ast(ast, env) as ISeq
-    val first = evaluated.first() as? MalFunction ?: throw MalException("cannot execute non-function")
-    return first.apply(evaluated.rest())
-}
-
-fun eval_ast(ast: MalType, env: Env): MalType =
-        when (ast) {
-            is MalSymbol -> env.get(ast)
-            is MalList -> ast.elements.fold(MalList(), { a, b -> a.conj_BANG(eval(b, env)); a })
-            is MalVector -> ast.elements.fold(MalVector(), { a, b -> a.conj_BANG(eval(b, env)); a })
-            is MalHashMap -> ast.elements.entries.fold(MalHashMap(), { a, b -> a.assoc_BANG(b.key, eval(b.value, env)); a })
-            else -> ast
+    if (ast !is MalList) {
+        return eval_ast(ast, env, depth)
+    }
+    else {
+        if (ast.atoms.isEmpty()) {
+            return ast
         }
+        else {
+            val op   = ast.head()
+            val args = ast.tail()
+            if(op is MalSymbol) {
+                when(op.sym) {
+                    "def!" -> {
+                        val v = EVAL(args[1], env, n)
+                        return env.set((args[0] as MalSymbol), v)
+                    }
+                    "let*" -> return EVAL(args[1], make_env((args[0] as MalSeq), env, depth), n)
+                    "do" -> return (eval_ast(args, env, depth) as MalList).last()
+                    "if" -> {
+                        val body = if(is_true(EVAL(args[0], env, n))) args[1] else
+                                   if(args.atoms.count() == 3)        args[2] else MalNil()
+                        return EVAL(body, env, n)
+                    }
+                    "fn*" -> {
+                        val binds = args[0] as MalSeq
+                        val body  = args[1]
+                        return malFun("funccall") { EVAL(body, Env(env, binds, it), n) }
+                    }
+                }
+            }
+            val l = eval_ast(ast, env, depth) as MalList
+            val f = l.head() as MalFunc
+            return f(l.tail())
+        }
+    }
+}
 
-fun print(result: MalType) = pr_str(result, print_readably = true)
+fun PRINT(v: MalType) = pr_str(v)
 
-fun rep(input: String, env: Env): String =
-        print(eval(read(input), env))
+fun rep(s: String) = PRINT(EVAL(READ(s), repl_env, 0))
+
+val repl_env = Env().apply {
+    core.ns.forEach { (k,v) -> set(k, v) }
+}
 
 fun main(args: Array<String>) {
-    val repl_env = Env()
-    ns.forEach({ it -> repl_env.set(it.key, it.value) })
-
-    rep("(def! not (fn* (a) (if a false true)))", repl_env)
-
-    while (true) {
-        val input = readline("user> ")
+    rep("(def! not (fn* [v] (if v false true)))")
+    while(true) {
+        print("user> ")
 
         try {
-            println(rep(input, repl_env))
-        } catch (e: EofException) {
-            break
-        } catch (e: MalContinue) {
-        } catch (e: MalException) {
-            println("Error: " + e.message)
-        } catch (t: Throwable) {
-            println("Uncaught " + t + ": " + t.message)
-            t.printStackTrace()
+            readLine()?.let { println(rep(it)) }
+        }
+        catch(e: Exception) {
+            println("Oh dear:" + e.toString())
+            eval_count = 0
         }
     }
 }
+

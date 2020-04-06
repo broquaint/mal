@@ -1,156 +1,181 @@
-package mal
+// For each match captured within the parenthesis starting at char 6
+// of the regular expression a new token will be created.
 
-import kotlin.text.Regex
+// TODO Support escaped double quotes e.g "foo \"bar\" baz" -> """foo "bar" baz"""
+private var tokenizer = Regex("""
+# Matches any number of whitespaces or commas
+[\s,]*
+(?:
+  # Captures the special two-characters ~@ (tokenized).
+  ~@ |
+  # Captures any special single character, one of []{}()'`~^@ (tokenized).
+  [\[\]{}()'`~^@] |
+  # Starts capturing at a double-quote and stops at the next double-quote unless
+  # it was preceded by a backslash in which case it includes it until the next
+  # double-quote (tokenized). It will also match unbalanced strings (no ending
+  # double-quote) which should be reported as an error.
+  "(?:\\"|[^"])*"? |
+  # Captures any sequence of characters starting with ; (tokenized).
+  ;.* |
+  # Captures a sequence of zero or more non special characters (e.g. symbols,
+  # numbers, "true", "false", and "nil") and is sort of the inverse of the one
+  # above that captures special characters (tokenized).
+  [^\s\[\]{}('"`,;)]*
+)
+""",
+setOf(RegexOption.COMMENTS, RegexOption.MULTILINE)
+)
 
-val TOKEN_REGEX = Regex("[\\s,]*(~@|[\\[\\]{}()'`~^@]|\"(?:\\\\.|[^\\\\\"])*\"?|;.*|[^\\s\\[\\]{}('\"`,;)]*)")
-val ATOM_REGEX = Regex("(^-?[0-9]+$)|(^nil$)|(^true$)|(^false$)|^\"((?:\\\\.|[^\\\\\"])*)\"$|^\"(.*)$|:(.*)|(^[^\"]*$)")
+private val commas = Regex("""^[\s,]*|[,\s]*$""", RegexOption.MULTILINE)
 
-class Reader(sequence: Sequence<String>) {
-    val tokens = sequence.iterator()
-    var current = advance()
+// This function will take a single string and return an array/list of all the tokens (strings) in it.
+fun tokenize(s: String) : List<String> {
+    // For some reason this fails where findAll doesn't.
+    // if (!tokenizer.matches(s)) {
+    //     throw MalCoreEx("Failed tokenizing")
+    // }
+    return tokenizer.findAll(s)
+            .map    { it.value.replace(commas, "") }
+            .filter { it.length > 0 }
+            .filter { !it.startsWith(";") }
+            .toList()
+}
 
-    fun next(): String? {
-        var result = current
-        current = advance()
-        return result
+// This object will store the tokens and a position.
+class Reader(val tokens: List<String>) {
+    var pos = 0
+    // returns the token at the current position and increments the position
+    fun next() = tokens[pos++]
+    // Check whether we're at the end.
+    fun isLast() = pos == (tokens.size - 1)
+    // just returns the token at the current position.
+    fun peek() = tokens[pos]
+}
+
+private fun is_number(s: String) = Regex("-?\\d+").matches(s)
+
+private fun is_bool(s: String) = setOf("true", "false").contains(s)
+
+private fun make_atom_deref(token: String) = MalList(listOf("deref", token).map(::malSym))
+
+// Use named variables otherwise we have to escape escaping x_x
+private val q  = "\u0022" // '"'  U+0022 &quot; QUOTATION MARK (Other_Punctuation)
+private val bs = "\u005C" // '\'  U+005C &bsol; REVERSE SOLIDUS (Other_Punctuation)
+
+// Reflect any changes in printer.kt
+private var readEscapeMap = mapOf(
+    "$bs$q"  to q,    // \" to "
+    "${bs}n" to "\n", // \n to ␤
+    "$bs$bs" to bs    // \\ to \
+)
+// Bleurgh, the escapes need escapes as they become interpolated into Regex ;_;
+private var readEscapes = Regex(listOf("$bs$bs$bs$bs", "(?<!$bs$bs)$bs$bs$q", "(?<!$bs$bs)$bs${bs}n").joinToString("|", "(", ")"))
+
+private fun make_string(s: String) =
+    if (s.last() == '"')
+        MalString(s.dropLast(1).replace(readEscapes) { readEscapeMap.get(it.value) ?: it.value })
+    else
+        throw MalUserEx("Unexpected end of input, unbalanced quote?")
+
+private fun make_with_meta(r: Reader, n: Int): MalType {
+    val meta = read_form(r, n)
+    val func = read_form(r, n)
+    return malListOf(malSym("with-meta"), func, meta)
+}
+
+private fun read_atom(r: Reader, n: Int) : MalType {
+    //    println("Reading atom: " + r)
+    val t = r.next()
+    return when {
+        t[0] == '"'  -> make_string(t.substring(1 .. t.lastIndex))
+        t[0] == ':'  -> MalKeyword(t.substring(1 .. t.lastIndex))
+        t[0] == '^'  -> make_with_meta(r, n)
+        is_number(t) -> MalNumber(t.toInt())
+        is_bool(t)   -> MalBoolean(t == "true")
+        t == "nil"   -> MalNil()
+        t == "@"     -> make_atom_deref(r.next())
+        t == "'"     -> malListOf(malSym("quote"), read_form(r, n))
+        t == "`"     -> malListOf(malSym("quasiquote"), read_form(r, n))
+        t == "~"     -> malListOf(malSym("unquote"), read_form(r, n))
+        t == "~@"    -> malListOf(malSym("splice-unquote"), read_form(r, n))
+        else         -> MalSymbol(t)
     }
-
-    fun peek(): String? = current
-
-    private fun advance(): String? = if (tokens.hasNext()) tokens.next() else null
 }
 
-fun read_str(input: String?): MalType {
-    val tokens = tokenizer(input) ?: return NIL
-    return read_form(Reader(tokens))
+private fun make_map(pairs: List<MalType>) : MalMap {
+    if(pairs.size % 2 != 0)
+        throw MalUserEx("maps requires an even number of items, got ${pairs.size} items")
+
+    val map : MutableMap<MalKey, MalType> = mutableMapOf()
+    for (idx in pairs.indices step 2) {
+        val k = pairs[idx] as MalKey
+        val v = pairs[idx + 1]
+        map[k] = v
+    }
+    return MalMap(map)
 }
 
-fun tokenizer(input: String?): Sequence<String>? {
-    if (input == null) return null
+fun make_map(pairs: MalSeq) = make_map(pairs.atoms)
 
-    return TOKEN_REGEX.findAll(input)
-            .map({ it -> it.groups[1]?.value as String })
-            .filter({ it != "" && !it.startsWith(";")})
+private var readLimit = 0
+
+// Safety limit to prevent the REPL never coming back.
+private fun check_limit() {
+    readLimit++
+    if (readLimit > 1024) {
+        throw MalCoreEx("Parser found no end :/")
+    }
 }
 
-fun read_form(reader: Reader): MalType =
-        when (reader.peek()) {
-            null -> throw MalContinue()
-            "("  -> read_list(reader)
-            ")"  -> throw MalReaderException("expected form, got ')'")
-            "["  -> read_vector(reader)
-            "]"  -> throw MalReaderException("expected form, got ']'")
-            "{"  -> read_hashmap(reader)
-            "}"  -> throw MalReaderException("expected form, got '}'")
-            "'"  -> read_shorthand(reader, "quote")
-            "`"  -> read_shorthand(reader, "quasiquote")
-            "~"  -> read_shorthand(reader, "unquote")
-            "~@" -> read_shorthand(reader, "splice-unquote")
-            "^"  -> read_with_meta(reader)
-            "@"  -> read_shorthand(reader, "deref")
-            else -> read_atom(reader)
+// This function will peek at the first token in the Reader object and
+// switch on the first character of that token. If the character is a
+// left paren then read_list is called with the Reader
+// object. Otherwise, read_atom is called with the Reader Object. The
+// return value from read_form is a mal data type.
+fun read_form(r: Reader, n: Int) : MalType {
+//    println("v1> " + " ".repeat(n) + "read_form")
+    try {
+        return when(r.peek()) {
+            "("  -> MalList(read_seq(")", r, n + 1))
+            "["  -> MalVector(read_seq("]", r, n + 1))
+            "{"  -> make_map(read_seq("}", r, n + 1))
+            else -> read_atom(r, n + 1)
         }
-
-fun read_list(reader: Reader): MalType = read_sequence(reader, MalList(), ")")
-fun read_vector(reader: Reader): MalType = read_sequence(reader, MalVector(), "]")
-
-private fun read_sequence(reader: Reader, sequence: IMutableSeq, end: String): MalType {
-    reader.next()
-
-    do {
-        val form = when (reader.peek()) {
-            null -> throw MalReaderException("expected '$end', got EOF")
-            end  -> { reader.next(); null }
-            else -> read_form(reader)
-        }
-
-        if (form != null) {
-            sequence.conj_BANG(form)
-        }
-    } while (form != null)
-
-    return sequence
+    }
+    catch(e: IndexOutOfBoundsException) {
+        throw MalUserEx("Unexpected end of input, unbalanced paren/brace/bracket?")
+    }
 }
 
-fun read_hashmap(reader: Reader): MalType {
-    reader.next()
-    val hashMap = MalHashMap()
-
-    do {
-        var value : MalType? = null;
-        val key = when (reader.peek()) {
-            null -> throw MalReaderException("expected '}', got EOF")
-            "}"  -> { reader.next(); null }
-            else -> {
-                var key = read_form(reader)
-                if (key !is MalString) {
-                    throw MalReaderException("hash-map keys must be strings or keywords")
-                }
-                value = when (reader.peek()) {
-                    null -> throw MalReaderException("expected form, got EOF")
-                    else -> read_form(reader)
-                }
-                key
-            }
-        }
-
-        if (key != null) {
-            hashMap.assoc_BANG(key, value as MalType)
-        }
-    } while (key != null)
-
-    return hashMap
-}
-
-fun read_shorthand(reader: Reader, symbol: String): MalType {
-    reader.next()
-
-    val list = MalList()
-    list.conj_BANG(MalSymbol(symbol))
-    list.conj_BANG(read_form(reader))
-
+private fun read_seq(endTok: String, r: Reader, n: Int) : List<MalType> {
+    r.next() // Move past the opening paren.
+//    val say = { m: String -> println("v1> " + " ".repeat(n) + m) }
+    val list : MutableList<MalType> = mutableListOf()
+    while(r.peek() != endTok) {
+//        say("at token: " + r.peek())
+        list.add(read_form(r, n))
+        check_limit()
+    }
+    if(!r.isLast()) r.next()
+//    say("returning list!")
     return list
 }
 
-fun read_with_meta(reader: Reader): MalType {
-    reader.next()
-
-    val meta = read_form(reader)
-    val obj = read_form(reader)
-
-    val list = MalList()
-    list.conj_BANG(MalSymbol("with-meta"))
-    list.conj_BANG(obj)
-    list.conj_BANG(meta)
-
-    return list
-}
-
-fun read_atom(reader: Reader): MalType {
-    val next = reader.next() ?: throw MalReaderException("Unexpected null token")
-    val groups = ATOM_REGEX.find(next)?.groups ?: throw MalReaderException("Unrecognized token: " + next)
-
-    return if (groups[1]?.value != null) {
-        MalInteger(groups[1]?.value?.toLong() ?: throw MalReaderException("Error parsing number: " + next))
-    } else if (groups[2]?.value != null) {
-        NIL
-    } else if (groups[3]?.value != null) {
-        TRUE
-    } else if (groups[4]?.value != null) {
-        FALSE
-    } else if (groups[5]?.value != null) {
-        MalString((groups[5]?.value as String).replace(Regex("""\\(.)"""))
-            { m: MatchResult ->
-                if (m.groups[1]?.value == "n") "\n"
-                else m.groups[1]?.value.toString()
-            })
-    } else if (groups[6]?.value != null) {
-        throw MalReaderException("expected '\"', got EOF")
-    } else if (groups[7]?.value != null) {
-        MalKeyword(groups[7]?.value as String)
-    } else if (groups[8]?.value != null) {
-        MalSymbol(groups[8]?.value as String)
-    } else {
-        throw MalReaderException("Unrecognized token: " + next)
+private fun read_form_safely(r: Reader) : MalType {
+    try {
+        return if(r.tokens.isEmpty()) {
+            emptyMalList()
+        }
+        else {
+            read_form(r, 0)
+        }
+    }
+    finally {
+        readLimit = 0
     }
 }
+
+// This function will call tokenize and then create a new Reader
+// object instance with the tokens. Then it will call read_form with
+// the Reader instance.
+fun read_str(s: String) = read_form_safely(Reader(tokenize(s)))
