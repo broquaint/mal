@@ -6,6 +6,6 @@ pub fn pr_str(val: MalVal) -> String {
         Sym(s) => s,
         List(l) => format!("({})", l.iter()
                            .map(|v| { pr_str(v.clone()) })
-                           .collect::<Vec<String>>().join("")),
+                           .collect::<Vec<String>>().join(" ")),
     }
 }

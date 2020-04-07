@@ -26,11 +26,11 @@ fn tokenize(input: String) -> Reader {
     let mut tokens: Vec<String> = Vec::new();
     // TODO, handle no match!
     for tok in re.captures_iter(&input) {
-        tokens.push(String::from(&tok[0]));
+        tokens.push(String::from(tok[0].trim().trim_matches(',')));
     }
 
-    println!("input : {}", input);
-    println!("tokens: {:?}", tokens);
+//    println!("input : {}", input);
+//    println!("tokens: {:?}", tokens);
     return Reader { pos: 0, tokens };
 }
 
