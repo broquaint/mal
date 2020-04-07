@@ -1,16 +1,11 @@
-use std::rc::Rc;
-
-use types::MalVal;
+use types::MalVal::{self, Int, Sym, List};
 
 pub fn pr_str(val: MalVal) -> String {
     match val {
-        MalVal::Int(n) => n.to_string(),
-        MalVal::Sym(s) => s,
-        MalVal::List(l) => format!(
-            "({})",
-            l.iter()
-                .map(|v| { pr_str(Rc::try_unwrap(v.clone()).unwrap()) })
-                .collect::<Vec<String>>().join(" ")
-        )
+        Int(n) => n.to_string(),
+        Sym(s) => s,
+        List(l) => format!("({})", l.iter()
+                           .map(|v| { pr_str(v.clone()) })
+                           .collect::<Vec<String>>().join("")),
     }
 }
