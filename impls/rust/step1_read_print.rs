@@ -11,7 +11,7 @@ mod printer;
 use printer::pr_str;
 
 #[allow(non_snake_case)]
-fn READ(code: String) -> MalVal {
+fn READ(code: String) -> Result<MalVal, String> {
     read_str(code)
 }
 
@@ -26,7 +26,10 @@ fn PRINT(code: MalVal) -> String {
 }
 
 fn rep(code: String) -> String {
-    PRINT(EVAL(READ(code)))
+    match READ(code) {
+        Ok(ast) => PRINT(EVAL(ast)),
+        Err(e)  => e
+    }
 }
 
 fn main() {

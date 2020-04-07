@@ -10,19 +10,34 @@ struct Reader {
 }
 
 impl Reader {
-    fn next(&mut self) -> &String {
-        let tok = &self.tokens[self.pos];
-        self.pos += 1;
-        return tok;
+    fn next(&mut self) -> Result<&String, String> {
+        return if self.pos < self.tokens.len() {
+            let tok = &self.tokens[self.pos];
+            self.pos += 1;
+            Ok(tok)
+        }
+        else {
+            Err(String::from("Reached end of input unexpectedly in next()"))
+        }
     }
-    fn peek(&self) -> &String {
-        &self.tokens[self.pos]
+
+    fn peek(&self) -> Result<&String, String> {
+        return if self.pos < self.tokens.len() {
+            Ok(&self.tokens[self.pos])
+        }
+        else {
+            Err(String::from("Reached end of input unexpectedly in peek()"))
+        }
+    }
+
+    fn is_last(&self) -> bool {
+        self.pos == self.tokens.len() - 1
     }
 }
 
 // [\s,]*(~@|[\[\]{}()'`~^@]|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"`,;)]*)
 fn tokenize(input: String) -> Reader {
-    let re = Regex::new(r#"[\s,]*(~@|[\[\]{}()'`~^@]|"(?:\.|[^"])*"?|;.*|[^\s\[\]{}('"`,;)]*)"#).unwrap();
+    let re = Regex::new(r#"[\s,]*(~@|[\[\]{}()'`~^@]|"(?:\.|[^"])*"?|;.*|[^\s\[\]{}('"`,;)]*)[\s,]*"#).unwrap();
     let mut tokens: Vec<String> = Vec::new();
     // TODO, handle no match!
     for tok in re.captures_iter(&input) {
@@ -39,34 +54,45 @@ fn is_number(tok: &String) -> bool {
     Regex::new(r"^-?\d+$").unwrap().is_match(tok)
 }
 
-fn read_atom(r: &mut Reader) -> MalVal {
-    let tok = r.next();
-    return if is_number(tok) {
-        Int(tok.parse::<i64>().unwrap())
-    }
-    else {
-        Sym(tok.clone())
-    }
+fn read_atom(r: &mut Reader) -> Result<MalVal, String> {
+    let tok = r.next()?;
+    Ok(
+        if is_number(tok) {
+            Int(tok.parse::<i64>().unwrap())
+        }
+        else {
+            Sym(tok.clone())
+        }
+    )
 }
 
-fn read_list(r: &mut Reader) -> MalVal {
-    r.next();
+fn read_list(r: &mut Reader) -> Result<MalVal, String> {
+    // We know that the current token is ( at this point.
+    #[allow(unused_must_use)]
+    r.next()?;
     let mut list: Vec<MalVal> = Vec::new();
-    while r.peek() != ")" {
-        list.push(read_form(r));
+
+    while r.peek()? != ")" {
+        list.push(read_form(r)?);
     }
-    return List(Rc::new(list));
+
+    // Move past the end paren.
+    if !r.is_last() {
+        r.next()?;
+    }
+
+    return Ok(List(Rc::new(list)));
 }
 
-fn read_form(r: &mut Reader) -> MalVal {
-    let tok = r.peek();
+fn read_form(r: &mut Reader) -> Result<MalVal, String> {
+    let tok = r.peek()?;
+//    println!("rf tok = {}", tok);
     match tok.as_str() {
         "(" => read_list(r),
         _   => read_atom(r),
     }
 }
 
-pub fn read_str(input: String) -> MalVal {
-    let mut r = tokenize(input);
-    read_form(&mut r)
+pub fn read_str(input: String) -> Result<MalVal, String> {
+    read_form(&mut tokenize(input))
 }
