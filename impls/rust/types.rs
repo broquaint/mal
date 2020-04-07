@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MalVal {
     Int(i64),
     Sym(String),
-    List(Vec<Rc<MalVal>>)
+    List(Rc<Vec<MalVal>>)
 }

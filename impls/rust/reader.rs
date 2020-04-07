@@ -22,12 +22,15 @@ impl Reader {
 
 // [\s,]*(~@|[\[\]{}()'`~^@]|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"`,;)]*)
 fn tokenize(input: String) -> Reader {
-    let re = Regex::new(r#""[\s,]*(~@|[\[\]{}()'`~^@]|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"`,;)]*)"#).unwrap();
+    let re = Regex::new(r#"[\s,]*(~@|[\[\]{}()'`~^@]|"(?:\.|[^"])*"?|;.*|[^\s\[\]{}('"`,;)]*)"#).unwrap();
     let mut tokens: Vec<String> = Vec::new();
+    // TODO, handle no match!
     for tok in re.captures_iter(&input) {
         tokens.push(String::from(&tok[0]));
     }
 
+    println!("input : {}", input);
+    println!("tokens: {:?}", tokens);
     return Reader { pos: 0, tokens };
 }
 
@@ -48,11 +51,11 @@ fn read_atom(r: &mut Reader) -> MalVal {
 
 fn read_list(r: &mut Reader) -> MalVal {
     r.next();
-    let mut list: Vec<Rc<MalVal>> = Vec::new();
+    let mut list: Vec<MalVal> = Vec::new();
     while r.peek() != ")" {
-        list.push(Rc::new(read_form(r)));
+        list.push(read_form(r));
     }
-    return List(list);
+    return List(Rc::new(list));
 }
 
 fn read_form(r: &mut Reader) -> MalVal {
