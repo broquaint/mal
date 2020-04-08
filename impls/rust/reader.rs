@@ -1,7 +1,9 @@
 use std::rc::Rc;
-use regex::Regex;
 
-use types::MalVal::{self, Int, Sym, List};
+use regex::Regex;
+use regex::Captures;
+
+use types::MalVal::{self, Int, Sym, Str, List};
 
 #[derive(Debug)]
 struct Reader {
@@ -37,7 +39,7 @@ impl Reader {
 
 // [\s,]*(~@|[\[\]{}()'`~^@]|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"`,;)]*)
 fn tokenize(input: String) -> Reader {
-    let re = Regex::new(r#"[\s,]*(~@|[\[\]{}()'`~^@]|"(?:\.|[^"])*"?|;.*|[^\s\[\]{}('"`,;)]*)[\s,]*"#).unwrap();
+    let re = Regex::new(r#"[\s,]*(~@|[\[\]{}()'`~^@]|"(?:\\"|[^"])*"?|;.*|[^\s\[\]{}('"`,;)]*)[\s,]*"#).unwrap();
     let mut tokens: Vec<String> = Vec::new();
     // TODO, handle no match!
     for tok in re.captures_iter(&input) {
@@ -54,16 +56,37 @@ fn is_number(tok: &String) -> bool {
     Regex::new(r"^-?\d+$").unwrap().is_match(tok)
 }
 
+fn make_string(tok: &str) -> String {
+    let escapes = Regex::new(r#"(\\"|\\n|\\\\)"#).unwrap();
+    escapes.replace_all(tok, |c: &Captures| match &c[1] {
+        r#"\""# => r#"""#,
+        r"\n" => "\n",
+        r"\\" => r"\",
+        _ => panic!("How did we get here in make_string?")
+    }).to_string()
+}
+
 fn read_atom(r: &mut Reader) -> Result<MalVal, String> {
     let tok = r.next()?;
-    Ok(
-        if is_number(tok) {
-            Int(tok.parse::<i64>().unwrap())
+    // Handle quote specifically to avoid panic.
+    if tok.starts_with("\"") {
+        return if tok.len() > 1 {
+            Ok(Str(make_string(&tok[1 .. tok.len() - 1])))
         }
         else {
-            Sym(tok.clone())
+            Err("Reach end of input, missing quote".to_string())
         }
-    )
+    }
+    else {   
+        Ok(
+            if is_number(tok) {
+                Int(tok.parse::<i64>().unwrap())
+            }
+            else {
+                Sym(tok.clone())
+            }
+        )
+    }
 }
 
 fn read_list(r: &mut Reader) -> Result<MalVal, String> {
