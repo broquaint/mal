@@ -66,15 +66,26 @@ fn make_string(tok: &str) -> String {
     }).to_string()
 }
 
+// https://graphemica.com/%CA%9E
+pub static KW_PREFIX: &str = "\u{029E}"; // : => ʞ
+
 fn read_atom(r: &mut Reader) -> Result<MalVal, String> {
     let tok = r.next()?;
     // Handle quote specifically to avoid panic.
-    if tok.starts_with("\"") {
+    if tok.starts_with("\"") || tok.starts_with(":") {
         return if tok.len() > 1 {
-            Ok(Str(make_string(&tok[1 .. tok.len() - 1])))
+            Ok(Str(
+                if tok.starts_with("\"") {
+                    make_string(&tok[1 .. tok.len() - 1])
+                }
+                else {
+                    // This is a keyword but implemented as Str for type sanity.
+                    format!("{}{}", KW_PREFIX, &tok[1 .. tok.len()])
+                }
+            ))
         }
         else {
-            Err("Reach end of input, missing quote".to_string())
+            Err("Reach end of input, missing quote/symbol".to_string())
         }
     }
     else {   
