@@ -5,5 +5,6 @@ pub enum MalVal {
     Int(i64),
     Str(String),
     Sym(String),
-    List(Rc<Vec<MalVal>>)
+    List(Rc<Vec<MalVal>>),
+    Vector(Rc<Vec<MalVal>>),
 }

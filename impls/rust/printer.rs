@@ -1,4 +1,4 @@
-use types::MalVal::{self, Int, Sym, Str, List};
+use types::MalVal::{self, Int, Sym, Str, List, Vector};
 
 use regex::{Regex, Captures};
 
@@ -18,6 +18,9 @@ pub fn pr_str(val: MalVal) -> String {
         Sym(s) => s,
         Str(s) => malstr_as_string(s),
         List(l) => format!("({})", l.iter()
+                           .map(|v| { pr_str(v.clone()) })
+                           .collect::<Vec<String>>().join(" ")),
+        Vector(l) => format!("[{}]", l.iter()
                            .map(|v| { pr_str(v.clone()) })
                            .collect::<Vec<String>>().join(" ")),
     }

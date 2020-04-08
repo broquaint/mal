@@ -3,7 +3,7 @@ use std::rc::Rc;
 use regex::Regex;
 use regex::Captures;
 
-use types::MalVal::{self, Int, Sym, Str, List};
+use types::MalVal::{self, Int, Sym, Str, List, Vector};
 
 #[derive(Debug)]
 struct Reader {
@@ -89,13 +89,13 @@ fn read_atom(r: &mut Reader) -> Result<MalVal, String> {
     }
 }
 
-fn read_list(r: &mut Reader) -> Result<MalVal, String> {
+fn read_seq(r: &mut Reader, end: &str) -> Result<Vec<MalVal>, String> {
     // We know that the current token is ( at this point.
     #[allow(unused_must_use)]
     r.next()?;
     let mut list: Vec<MalVal> = Vec::new();
 
-    while r.peek()? != ")" {
+    while r.peek()? != end {
         list.push(read_form(r)?);
     }
 
@@ -104,7 +104,16 @@ fn read_list(r: &mut Reader) -> Result<MalVal, String> {
         r.next()?;
     }
 
-    return Ok(List(Rc::new(list)));
+    return Ok(list);
+}
+
+fn read_list(r: &mut Reader) -> Result<MalVal, String> {
+    Ok(List(Rc::new(read_seq(r, ")")?)))
+}
+
+
+fn read_vec(r: &mut Reader) -> Result<MalVal, String> {
+    Ok(Vector(Rc::new(read_seq(r, "]")?)))
 }
 
 fn read_form(r: &mut Reader) -> Result<MalVal, String> {
@@ -112,6 +121,7 @@ fn read_form(r: &mut Reader) -> Result<MalVal, String> {
 //    println!("rf tok = {}", tok);
     match tok.as_str() {
         "(" => read_list(r),
+        "[" => read_vec(r),
         _   => read_atom(r),
     }
 }
