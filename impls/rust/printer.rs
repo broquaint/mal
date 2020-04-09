@@ -1,4 +1,4 @@
-use types::MalVal::{self, Int, Sym, Str, List, Vector};
+use types::MalVal::{self, Int, Sym, Str, List, Vector, Map};
 use reader::{KW_PREFIX};
 
 use regex::{Regex, Captures};
@@ -29,6 +29,11 @@ pub fn pr_str(val: MalVal) -> String {
                            .collect::<Vec<String>>().join(" ")),
         Vector(l) => format!("[{}]", l.iter()
                            .map(|v| { pr_str(v.clone()) })
-                           .collect::<Vec<String>>().join(" ")),
+                             .collect::<Vec<String>>().join(" ")),
+        // It seems {{}} is the \ of format!()
+        // https://doc.rust-lang.org/std/fmt/index.html#escaping
+        Map(m) => format!("{{{}}}", m.iter()
+                          .map(|(k,v)| format!("{} {}", malstr_as_string(k.clone()), pr_str(v.clone())))
+                          .collect::<Vec<String>>().join(" ")),
     }
 }

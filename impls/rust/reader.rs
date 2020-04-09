@@ -1,9 +1,10 @@
 use std::rc::Rc;
+use std::collections::HashMap;
 
 use regex::Regex;
 use regex::Captures;
 
-use types::MalVal::{self, Int, Sym, Str, List, Vector};
+use types::MalVal::{self, Int, Sym, Str, List, Vector, Map};
 
 #[derive(Debug)]
 struct Reader {
@@ -122,9 +123,26 @@ fn read_list(r: &mut Reader) -> Result<MalVal, String> {
     Ok(List(Rc::new(read_seq(r, ")")?)))
 }
 
-
 fn read_vec(r: &mut Reader) -> Result<MalVal, String> {
     Ok(Vector(Rc::new(read_seq(r, "]")?)))
+}
+
+fn read_map(r: &mut Reader) -> Result<MalVal, String> {
+    let pairs = read_seq(r, "}")?;
+
+    if pairs.len() % 2 == 0 {
+        let mut map : HashMap<String, MalVal> = HashMap::new();
+        for pair in pairs.chunks(2) {
+            match &pair[0] {
+                Str(s) => { map.insert(s.clone(), pair[1].clone()); }
+                _      => return Err("only Str can be use as a map key".to_string())
+            }
+        }
+        Ok(Map(Rc::new(map)))
+    }
+    else {
+        Err(format!("maps requires an even number of items, got {} items", pairs.len()))
+    }
 }
 
 fn read_form(r: &mut Reader) -> Result<MalVal, String> {
@@ -133,6 +151,7 @@ fn read_form(r: &mut Reader) -> Result<MalVal, String> {
     match tok.as_str() {
         "(" => read_list(r),
         "[" => read_vec(r),
+        "{" => read_map(r),
         _   => read_atom(r),
     }
 }
