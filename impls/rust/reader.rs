@@ -44,7 +44,10 @@ fn tokenize(input: String) -> Reader {
     let mut tokens: Vec<String> = Vec::new();
     // TODO, handle no match!
     for tok in re.captures_iter(&input) {
-        tokens.push(String::from(tok[0].trim().trim_matches(',')));
+        let token = tok[0].trim().trim_matches(',');
+        // Skip empty tokens and comments.
+        if token.len() == 0 || token.starts_with(';') { continue }
+        tokens.push(String::from(token));
     }
 
 //    println!("input : {}", input);
