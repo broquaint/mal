@@ -6,7 +6,7 @@ extern crate regex;
 
 mod types;
 //use types::MalVal;
-use types::MalVal::{self, Int, Sym, List, Fun};
+use types::MalVal::{self, Int, Sym, List, Vector, Map, Fun};
 mod reader;
 use reader::read_str;
 mod printer;
@@ -21,10 +21,25 @@ fn eval_ast(ast: &MalVal, menv: &MalEnv) -> MalRet {
             let mut new_list: Vec<MalVal> = Vec::new();
             // Iterate with for-loop to raise the first Err encountered.
             for v in l.iter() {
-                // TODO Change List to List(Rc(&MalVal)) to avoid excess clones.
                 new_list.push(EVAL(&v, &menv)?);
             }
             Ok(List(Rc::new(new_list)))
+        },
+        Vector(l) => {
+            let mut new_vec: Vec<MalVal> = Vec::new();
+            // Iterate with for-loop to raise the first Err encountered.
+            for v in l.iter() {
+                new_vec.push(EVAL(&v, &menv)?);
+            }
+            Ok(Vector(Rc::new(new_vec)))
+        },
+        Map(l) => {
+            let mut new_map: HashMap<String, MalVal> = HashMap::new();
+            // Iterate with for-loop to raise the first Err encountered.
+            for (k, v) in l.iter() {
+                new_map.insert(k.clone(), EVAL(&v, &menv)?);
+            }
+            Ok(Map(Rc::new(new_map)))
         },
         Sym(s) => if menv.contains_key(s.as_str()) {
                 Ok(menv.get(s.as_str()).unwrap().clone())
