@@ -9,6 +9,7 @@ pub enum MalVal {
     Int(i64),
     Str(String),
     Sym(String),
+    Nil,
     List(Rc<Vec<MalVal>>),
     Vector(Rc<Vec<MalVal>>),
     Map(Rc<HashMap<String, MalVal>>),

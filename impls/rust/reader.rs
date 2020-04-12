@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use regex::Regex;
 use regex::Captures;
 
-use types::MalVal::{self, Int, Sym, Str, List, Vector, Map};
+use types::MalVal::{self, Int, Sym, Str, List, Vector, Nil, Map};
 
 #[derive(Debug)]
 struct Reader {
@@ -91,6 +91,9 @@ fn read_atom(r: &mut Reader) -> Result<MalVal, String> {
         else {
             Err("Reach end of input, missing quote/symbol".to_string())
         }
+    }
+    else if tok == "nil" {
+        Ok(Nil)
     }
     else {   
         Ok(
