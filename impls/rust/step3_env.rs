@@ -5,15 +5,15 @@ use std::rc::Rc;
 extern crate regex;
 
 mod types;
-//use types::MalVal;
 use types::MalVal::{self, Int, Sym, List, Vector, Map, Fun};
 mod reader;
 use reader::read_str;
 mod printer;
 use printer::pr_str;
+mod env;
+use env::MalEnv;
 
 type MalRet = Result<MalVal, String>;
-type MalEnv = HashMap<String, MalVal>;
 
 fn eval_ast(ast: &MalVal, menv: &MalEnv) -> MalRet {
     match ast {
@@ -29,7 +29,7 @@ fn eval_ast(ast: &MalVal, menv: &MalEnv) -> MalRet {
             let mut new_vec: Vec<MalVal> = Vec::new();
             // Iterate with for-loop to raise the first Err encountered.
             for v in l.iter() {
-                new_vec.push(EVAL(&v, &menv)?);
+                new_vec.push(EVAL(v, menv)?);
             }
             Ok(Vector(Rc::new(new_vec)))
         },
@@ -37,16 +37,11 @@ fn eval_ast(ast: &MalVal, menv: &MalEnv) -> MalRet {
             let mut new_map: HashMap<String, MalVal> = HashMap::new();
             // Iterate with for-loop to raise the first Err encountered.
             for (k, v) in l.iter() {
-                new_map.insert(k.clone(), EVAL(&v, &menv)?);
+                new_map.insert(k.clone(), EVAL(v, menv)?);
             }
             Ok(Map(Rc::new(new_map)))
         },
-        Sym(s) => if menv.contains_key(s.as_str()) {
-                Ok(menv.get(s.as_str()).unwrap().clone())
-            }
-            else {
-                Err(format!("Unknown symbol '{}'", &s))
-            }
+        Sym(s) => menv.get(&s),
         _ => Ok(ast.clone())
     }
 }
@@ -125,11 +120,11 @@ fn mal_div(args: &[MalVal]) -> MalRet {
 }
 
 fn main() {
-    let mut repl_env : MalEnv = HashMap::new();
-    repl_env.insert("+".to_string(), Fun(mal_add));
-    repl_env.insert("-".to_string(), Fun(mal_sub));
-    repl_env.insert("*".to_string(), Fun(mal_mul));
-    repl_env.insert("/".to_string(), Fun(mal_div));
+    let mut repl_env : MalEnv = MalEnv { outer: None, data: HashMap::new() };
+    repl_env.set("+".to_string(), Fun(mal_add));
+    repl_env.set("-".to_string(), Fun(mal_sub));
+    repl_env.set("*".to_string(), Fun(mal_mul));
+    repl_env.set("/".to_string(), Fun(mal_div));
 
     loop {
         print!("user> ");
