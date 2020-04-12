@@ -54,37 +54,39 @@ fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
                 Ok(ast.clone())
             }
             else {
-                if let List(fcall) = eval_ast(ast, menv)? {
-                    // Shouldn't panic as we know l isn't empty.
-                    let (fun, args) = fcall.split_first().unwrap();
-                    match fun {
-                        Sym(tok) => {
-                            match tok.as_str() {
-                                "def!" => {
-                                    let (name, rest) = args.split_first().unwrap();
-                                    match name {
-                                        Sym(s) => {
-                                            let val = EVAL(&List(Rc::new(rest.to_vec())), menv)?;
-                                            menv.set(s.clone(), val.clone());
-                                            Ok(val)
-                                        },
-                                        _ => Err("First elem of def! wasn't a Sym".to_string())
-                                    }
-                                }
-                                _ => Err(format!("Don't know what to do with '{}'", tok))
-                                // ,
-                                // "let*" => {
-                                // }
+                // Shouldn't panic as we know l isn't empty.
+                let (sym, rest) = l.split_first().unwrap();
+                if let Sym(tok) = sym {
+                    match tok.as_str() {
+                        "def!" => {
+                            let (name, args) = rest.split_first().unwrap();
+                            match name {
+                                Sym(s) => {
+                                    let val = EVAL(&args[0], menv)?;
+                                    menv.set(s.clone(), val.clone());
+                                    Ok(val)
+                                },
+                                _ => Err("First elem of def! wasn't a Sym".to_string())
                             }
-                        },
-                        Fun(f) => f(args),
-                        _ => Err("Tried to call function on non-Fun".to_string())
+                        }
+                        _ => {
+                            if let List(fcall) = eval_ast(ast, menv)? {
+                                // Shouldn't panic as we know l isn't empty.
+                                let (fun, args) = fcall.split_first().unwrap();
+                                match fun {
+                                    Fun(f) => f(args),
+                                    _ => Err("Tried to call function on non-Fun".to_string())
+                                }
+                            }
+                            else {
+                                Err("Somehow eval_ast(List) didn't return a list?".to_string())
+                            }
+                        }
                     }
                 }
                 else {
-                    Err("Somehow eval_ast(List) didn't return a list?".to_string())
+                    Err(format!("got non-sym '{}' at the head of a list?", pr_str(sym.clone())))
                 }
-                
             }
         }
         v => eval_ast(&v, menv)
