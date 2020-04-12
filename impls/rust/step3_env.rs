@@ -13,6 +13,10 @@ use printer::pr_str;
 mod env;
 use env::MalEnv;
 
+macro_rules! err {
+    ($e:expr) => { Err($e.to_string()) }
+}
+
 type MalRet = Result<MalVal, String>;
 
 fn eval_ast(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
@@ -48,7 +52,7 @@ fn eval_ast(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
 
 fn make_env(binds: &Rc<Vec<MalVal>>, new_env: &mut MalEnv) -> Result<bool, String> {
     if binds.len() % 2 != 0 {
-        return Err("binds for let* wasn't even".to_string())
+        return err!("binds for let* wasn't even")
     }
 
     for bind in binds.chunks(2) {
@@ -57,7 +61,7 @@ fn make_env(binds: &Rc<Vec<MalVal>>, new_env: &mut MalEnv) -> Result<bool, Strin
                 let v = EVAL(&bind[1], new_env)?;
                 new_env.set(k.clone(), v);
             }
-            _ => return Err("bind in let* wasn't a symbol".to_string())
+            _ => return err!("bind in let* wasn't a symbol")
         }
     }
 
@@ -85,7 +89,7 @@ fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
                                     menv.set(s.clone(), val.clone());
                                     Ok(val)
                                 },
-                                _ => Err("First elem of def! wasn't a Sym".to_string())
+                                _ => err!("First elem of def! wasn't a Sym")
                             }
                         },
                         "let*" => {
@@ -97,7 +101,7 @@ fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
                                     make_env(bl, &mut inner_env)?;
                                     Ok(EVAL(form, &mut inner_env)?)
                                 }
-                                _ => Err("First elem of let* wasn't a list/vec".to_string())
+                                _ => err!("First elem of let* wasn't a list/vec")
                             }
                         }
                         _ => {
@@ -106,11 +110,11 @@ fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
                                 let (fun, args) = fcall.split_first().unwrap();
                                 match fun {
                                     Fun(f) => f(args),
-                                    _ => Err("Tried to call function on non-Fun".to_string())
+                                    _ => err!("Tried to call function on non-Fun")
                                 }
                             }
                             else {
-                                Err("Somehow eval_ast(List) didn't return a list?".to_string())
+                                err!("Somehow eval_ast(List) didn't return a list?")
                             }
                         }
                     }
@@ -138,14 +142,14 @@ fn rep(code: String, menv: &mut MalEnv) -> Result<String, String> {
     let ast = READ(code)?;
     match EVAL(&ast, menv) {
         Ok(ast) => Ok(PRINT(&ast)),
-        Err(e)  => Err(e)
+        Err(e) => Err(e)
     }
 }
 
 fn mal_add(args: &[MalVal]) -> MalRet {
     match (&args[0], &args[1]) {
         (Int(a), Int(b)) => Ok(MalVal::Int(a + b)),
-        _ => Err("Can only add two Ints!".to_string())
+        _ => err!("Can only add two Ints!")
     }
 }
 
@@ -153,21 +157,21 @@ fn mal_add(args: &[MalVal]) -> MalRet {
 fn mal_sub(args: &[MalVal]) -> MalRet {
     match (&args[0], &args[1]) {
         (Int(a), Int(b)) => Ok(MalVal::Int(a - b)),
-        _ => Err("Can only subtract two Ints!".to_string())
+        _ => err!("Can only subtract two Ints!")
     }
 }
 
 fn mal_mul(args: &[MalVal]) -> MalRet {
     match (&args[0], &args[1]) {
         (Int(a), Int(b)) => Ok(MalVal::Int(a * b)),
-        _ => Err("Can only multiply two Ints!".to_string())
+        _ => err!("Can only multiply two Ints!")
     }
 }
 
 fn mal_div(args: &[MalVal]) -> MalRet {
     match (&args[0], &args[1]) {
         (Int(a), Int(b)) => Ok(MalVal::Int(a / b)),
-        _ => Err("Can only divide two Ints!".to_string())
+        _ => err!("Can only divide two Ints!")
     }
 }
 
