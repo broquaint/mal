@@ -2,12 +2,17 @@ use std::collections::HashMap;
 
 use types::MalVal;
 
+#[derive(Clone)]
 pub struct MalEnv {
     pub outer: Option<Box<MalEnv>>,
     pub data:  HashMap<String, MalVal>
 }
 
 impl MalEnv {
+    pub fn make_inner(&self) -> MalEnv {
+        MalEnv { outer: Some(Box::new(self.clone())), data: HashMap::new() }
+    }
+
     pub fn set(&mut self, k: String, v: MalVal) {
         self.data.insert(k, v.clone());
     }

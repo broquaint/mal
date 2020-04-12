@@ -46,6 +46,25 @@ fn eval_ast(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
     }
 }
 
+fn make_env(binds: &Rc<Vec<MalVal>>, new_env: &mut MalEnv) -> Result<bool, String> {
+    if binds.len() % 2 != 0 {
+        return Err("binds for let* wasn't even".to_string())
+    }
+
+    for bind in binds.chunks(2) {
+        match &bind[0] {
+            Sym(k) => {
+                let v = EVAL(&bind[1], new_env)?;
+                new_env.set(k.clone(), v);
+            }
+            _ => return Err("bind in let* wasn't a symbol".to_string())
+        }
+    }
+
+    // XXX Bleurgh, really just want early error on non-sym.
+    Ok(true)
+}
+
 #[allow(non_snake_case)]
 fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
     match ast {
@@ -67,6 +86,18 @@ fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
                                     Ok(val)
                                 },
                                 _ => Err("First elem of def! wasn't a Sym".to_string())
+                            }
+                        },
+                        "let*" => {
+                            let binds = &rest[0];
+                            let form  = &rest[1];
+                            match binds {
+                                List(bl) | Vector(bl) => {
+                                    let mut inner_env = menv.make_inner();
+                                    make_env(bl, &mut inner_env)?;
+                                    Ok(EVAL(form, &mut inner_env)?)
+                                }
+                                _ => Err("First elem of let* wasn't a list/vec".to_string())
                             }
                         }
                         _ => {
@@ -141,7 +172,7 @@ fn mal_div(args: &[MalVal]) -> MalRet {
 }
 
 fn main() {
-    let mut repl_env : MalEnv = MalEnv { outer: None, data: HashMap::new() };
+    let mut repl_env = MalEnv { outer: None, data: HashMap::new() };
     repl_env.set("+".to_string(), Fun(mal_add));
     repl_env.set("-".to_string(), Fun(mal_sub));
     repl_env.set("*".to_string(), Fun(mal_mul));
