@@ -15,13 +15,13 @@ use env::MalEnv;
 
 type MalRet = Result<MalVal, String>;
 
-fn eval_ast(ast: &MalVal, menv: &MalEnv) -> MalRet {
+fn eval_ast(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
     match ast {
         List(l) => {
             let mut new_list: Vec<MalVal> = Vec::new();
             // Iterate with for-loop to raise the first Err encountered.
             for v in l.iter() {
-                new_list.push(EVAL(&v, &menv)?);
+                new_list.push(EVAL(&v, menv)?);
             }
             Ok(List(Rc::new(new_list)))
         },
@@ -47,7 +47,7 @@ fn eval_ast(ast: &MalVal, menv: &MalEnv) -> MalRet {
 }
 
 #[allow(non_snake_case)]
-fn EVAL(ast: &MalVal, menv: &MalEnv) -> MalRet {
+fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
     match ast {
         List(l) => {
             if l.is_empty() {
@@ -58,6 +58,25 @@ fn EVAL(ast: &MalVal, menv: &MalEnv) -> MalRet {
                     // Shouldn't panic as we know l isn't empty.
                     let (fun, args) = fcall.split_first().unwrap();
                     match fun {
+                        Sym(tok) => {
+                            match tok.as_str() {
+                                "def!" => {
+                                    let (name, rest) = args.split_first().unwrap();
+                                    match name {
+                                        Sym(s) => {
+                                            let val = EVAL(&List(Rc::new(rest.to_vec())), menv)?;
+                                            menv.set(s.clone(), val.clone());
+                                            Ok(val)
+                                        },
+                                        _ => Err("First elem of def! wasn't a Sym".to_string())
+                                    }
+                                }
+                                _ => Err(format!("Don't know what to do with '{}'", tok))
+                                // ,
+                                // "let*" => {
+                                // }
+                            }
+                        },
                         Fun(f) => f(args),
                         _ => Err("Tried to call function on non-Fun".to_string())
                     }
@@ -82,7 +101,7 @@ fn READ(code: String) -> Result<MalVal, String> {
     read_str(code)
 }
 
-fn rep(code: String, menv: &MalEnv) -> Result<String, String> {
+fn rep(code: String, menv: &mut MalEnv) -> Result<String, String> {
     let ast = READ(code)?;
     match EVAL(&ast, menv) {
         Ok(ast) => Ok(PRINT(&ast)),
@@ -133,7 +152,7 @@ fn main() {
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
             Ok(_)  => {
-                let result = rep(input, &repl_env);
+                let result = rep(input, &mut repl_env);
                 println!("{}", match result { Ok(s) => s, Err(e) => e });
             }
             Err(_) => { break; }
