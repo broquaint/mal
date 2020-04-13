@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use std::collections::HashMap;
 
 use printer::pr_str;
@@ -84,6 +85,26 @@ pub fn core_ns() -> HashMap<String, MalVal> {
     add("println", |args| {
         println!("{}", _str(args, " "));
         Ok(Nil)
+    });
+
+    add("list", |args| {
+        Ok(List(Rc::new(args.to_vec())))
+    });
+
+    add("list?", |args| {
+        Ok(Bool(matches!(args[0], List(_))))
+    });
+
+    add("empty?", |args| {
+        Ok(Bool(matches!(&args[0], List(l) | Vector(l) if l.is_empty())))
+    });
+
+    add("count", |args| {
+        match &args[0] {
+            List(l) | Vector(l) => Ok(Int(l.len() as i64)),
+            Nil => Ok(Int(0)),
+            _ => err!("Can't count a non list/vec")
+        }
     });
 
     return ns
