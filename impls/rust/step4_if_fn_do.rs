@@ -5,7 +5,7 @@ use std::rc::Rc;
 extern crate regex;
 
 mod types;
-use types::MalVal::{self, Int, Sym, List, Vector, Map, Fun};
+use types::MalVal::{self, Int, Sym, Bool, Nil, List, Vector, Map, Fun};
 mod reader;
 use reader::read_str;
 mod printer;
@@ -69,6 +69,14 @@ fn make_env(binds: &Rc<Vec<MalVal>>, new_env: &mut MalEnv) -> Result<bool, Strin
     Ok(true)
 }
 
+fn is_true(cond: MalVal) -> bool {
+    match cond {
+        Bool(b) => b,
+        Nil     => false,
+        _       => true
+    }
+}
+
 #[allow(non_snake_case)]
 fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
     match ast {
@@ -110,6 +118,18 @@ fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
                                 EVAL(&elem, menv)?;
                             }
                             Ok(EVAL(&last, menv)?)
+                        }
+                        "if" => {
+                            // rest[0] = cond, rest[1] = true branch, rest[2] = false branch
+                            if is_true(EVAL(&rest[0], menv)?) {
+                                Ok(EVAL(&rest[1], menv)?)
+                            }
+                            else if rest.len() > 2 {
+                                Ok(EVAL(&rest[2], menv)?)
+                            }
+                            else {
+                                Ok(Nil)
+                            }
                         }
                         _ => {
                             if let List(fcall) = eval_ast(ast, menv)? {
