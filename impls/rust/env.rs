@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use std::collections::HashMap;
 
-use types::MalVal::{self, Sym};
+use types::MalVal::{self, List, Sym};
 
 #[derive(Clone)]
 pub struct MalEnv {
@@ -19,8 +19,21 @@ impl MalEnv {
 
         for idx in 0 .. binds.len() {
             match &binds[idx] {
-                // TODO Result!
-                Sym(s) => { params.insert(s.clone(), args[idx].clone()); }
+                Sym(s) => {
+                    if s == "&" {
+                        if let Sym(rest) = &binds[idx + 1] {
+                            let etc = &args[idx .. args.len()];
+                            params.insert(rest.clone(), List(Rc::new(etc.to_vec())));
+                            break;
+                        }
+                        else {
+                            return Err("Got a non-sym after & in binds".to_string())
+                        }
+                    }
+                    else {
+                        params.insert(s.clone(), args[idx].clone());
+                    }
+                }
                 _ => return Err("Got a non-sym in fn*".to_string())
             }
         }
