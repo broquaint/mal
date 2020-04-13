@@ -19,23 +19,25 @@ fn malstr_as_string(s: String) -> String {
     }
 }
 
-pub fn pr_str(val: MalVal) -> String {
+pub fn pr_str(val: MalVal, print_readably: bool) -> String {
+    // Helper to avoid repeating print_readably.
+    let pr = |v| { pr_str(v, print_readably) };
     match val {
         Int(n) => n.to_string(),
         Sym(s) => s,
         Bool(b) => (if b { "true" } else { "false" }).to_string(),
         Nil  => "nil".to_string(),
-        Str(s) => malstr_as_string(s),
+        Str(s) => if print_readably { malstr_as_string(s) } else { s },
         List(l) => format!("({})", l.iter()
-                           .map(|v| { pr_str(v.clone()) })
+                           .map(|v| { pr(v.clone()) })
                            .collect::<Vec<String>>().join(" ")),
         Vector(l) => format!("[{}]", l.iter()
-                           .map(|v| { pr_str(v.clone()) })
+                           .map(|v| { pr(v.clone()) })
                              .collect::<Vec<String>>().join(" ")),
         // It seems {{}} is the \ of format!()
         // https://doc.rust-lang.org/std/fmt/index.html#escaping
         Map(m) => format!("{{{}}}", m.iter()
-                          .map(|(k,v)| format!("{} {}", malstr_as_string(k.clone()), pr_str(v.clone())))
+                          .map(|(k,v)| format!("{} {}", malstr_as_string(k.clone()), pr(v.clone())))
                           .collect::<Vec<String>>().join(" ")),
         CoreFun(_) | UserFun(_) => String::from("#<function>"),
     }
