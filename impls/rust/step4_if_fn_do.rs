@@ -13,6 +13,8 @@ mod printer;
 use printer::pr_str;
 mod env;
 use env::MalEnv;
+mod core;
+use core::core_ns;
 
 macro_rules! err {
     ($e:expr) => { Err($e.to_string()) }
@@ -196,41 +198,12 @@ fn rep(code: String, menv: &mut MalEnv) -> Result<String, String> {
     }
 }
 
-fn mal_add(args: &[MalVal]) -> MalRet {
-    match (&args[0], &args[1]) {
-        (Int(a), Int(b)) => Ok(MalVal::Int(a + b)),
-        _ => err!("Can only add two Ints!")
-    }
-}
-
-
-fn mal_sub(args: &[MalVal]) -> MalRet {
-    match (&args[0], &args[1]) {
-        (Int(a), Int(b)) => Ok(MalVal::Int(a - b)),
-        _ => err!("Can only subtract two Ints!")
-    }
-}
-
-fn mal_mul(args: &[MalVal]) -> MalRet {
-    match (&args[0], &args[1]) {
-        (Int(a), Int(b)) => Ok(MalVal::Int(a * b)),
-        _ => err!("Can only multiply two Ints!")
-    }
-}
-
-fn mal_div(args: &[MalVal]) -> MalRet {
-    match (&args[0], &args[1]) {
-        (Int(a), Int(b)) => Ok(MalVal::Int(a / b)),
-        _ => err!("Can only divide two Ints!")
-    }
-}
-
 fn main() {
     let mut repl_env = MalEnv { outer: None, data: HashMap::new() };
-    repl_env.set("+".to_string(), CoreFun(mal_add));
-    repl_env.set("-".to_string(), CoreFun(mal_sub));
-    repl_env.set("*".to_string(), CoreFun(mal_mul));
-    repl_env.set("/".to_string(), CoreFun(mal_div));
+
+    for (k,v) in &core_ns() {
+        repl_env.set(k.clone(), v.clone());
+    }
 
     loop {
         print!("user> ");
