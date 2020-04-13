@@ -46,12 +46,34 @@ fn mal_div(args: &[MalVal]) -> MalRet {
     }
 }
 
+fn _pr_str(args: &[MalVal]) -> String {
+    args.iter().map(|v| { pr_str(v.clone(), true) })
+        .collect::<Vec<String>>()
+        .join(" ")
+}
+
+fn _str(args: &[MalVal], joiner: &str) -> String {
+    args.iter().map(|v| { pr_str(v.clone(), false) })
+        .collect::<Vec<String>>()
+        .join(joiner)
+}
+
+fn mal_pr_str(args: &[MalVal]) -> MalRet {
+    Ok(Str(_pr_str(args)))
+}
+
+fn mal_str(args: &[MalVal]) -> MalRet {
+    Ok(Str(_str(args, "")))
+}
+
 fn prn(args: &[MalVal]) -> MalRet {
-    Ok(
-        Str(
-            args.iter().map(|v| { pr_str(v.clone(), true) }).collect::<Vec<String>>().join(" ")
-        )
-    )
+    println!("{}", _pr_str(args));
+    Ok(Nil)
+}
+
+fn mal_println(args: &[MalVal]) -> MalRet {
+    println!("{}", _str(args, " "));
+    Ok(Nil)
 }
 
 pub fn core_ns() -> HashMap<String, MalVal> {
@@ -60,6 +82,10 @@ pub fn core_ns() -> HashMap<String, MalVal> {
     ns.insert("-".to_string(), CoreFun(mal_sub));
     ns.insert("*".to_string(), CoreFun(mal_mul));
     ns.insert("/".to_string(), CoreFun(mal_div));
+
+    ns.insert("pr-str".to_string(), CoreFun(mal_pr_str));
+    ns.insert("str".to_string(), CoreFun(mal_str));
     ns.insert("prn".to_string(), CoreFun(prn));
+    ns.insert("println".to_string(), CoreFun(mal_println));
     return ns
 }
