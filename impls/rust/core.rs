@@ -36,6 +36,43 @@ fn _str(args: &[MalVal], joiner: &str) -> String {
         .join(joiner)
 }
 
+fn is_equal(args: &[MalVal]) -> bool {
+    mal_eq(&args[0], &args[1])
+}
+
+// Would be trivial if I could figure out how to implement PartialEq for
+// the *Fun values.
+fn mal_eq(this: &MalVal, that: &MalVal) -> bool {
+    match (this, that) {
+        (Int(a), Int(b)) => a == b,
+        (Str(a), Str(b)) => a == b,
+        (Sym(a), Sym(b)) => a == b,
+        (Bool(a), Bool(b)) => a == b,
+        (Nil, Nil) => true,
+        (List(a), List(b)) => compare_lists(&a, &b),
+        (Vector(a), Vector(b)) => compare_lists(&a, &b),
+        // A little shabby but it'll do.
+        (List(a), Vector(b)) => compare_lists(&a, &b),
+        (Vector(a), List(b)) => compare_lists(&a, &b),
+        (Map(a), Map(b)) => compare_maps(&a, &b),
+        // (UserFun(_), UserFun(_)) => false, // TODO?
+        // (CoreFun(_), CoreFun(_)) => false, // TODO?
+         _ => false
+    }
+}
+
+fn compare_lists(this: &Rc<Vec<MalVal>>, that: &Rc<Vec<MalVal>>) -> bool {
+    this.len() == that.len() &&
+        (0 .. this.len()).all(|idx| { mal_eq(&this[idx], &that[idx]) })
+}
+
+fn compare_maps(this: &Rc<HashMap<String, MalVal>>, that: &Rc<HashMap<String, MalVal>>) -> bool {
+    this.len() == that.len() &&
+        this.keys().all(|k| {
+            that.contains_key(k) && mal_eq(this.get(k).unwrap(), that.get(k).unwrap())
+        })
+}
+
 pub fn core_ns() -> HashMap<String, MalVal> {
     let mut ns = HashMap::new();
 
@@ -105,6 +142,10 @@ pub fn core_ns() -> HashMap<String, MalVal> {
             Nil => Ok(Int(0)),
             _ => err!("Can't count a non list/vec")
         }
+    });
+
+    add("=", |args| {
+        Ok(Bool(is_equal(args)))
     });
 
     return ns
