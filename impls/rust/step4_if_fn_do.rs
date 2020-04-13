@@ -5,7 +5,8 @@ use std::rc::Rc;
 extern crate regex;
 
 mod types;
-use types::MalVal::{self, Int, Sym, Bool, Nil, List, Vector, Map, Fun};
+use types::MalVal::{self, *};
+use types::MalUserFn;
 mod reader;
 use reader::read_str;
 mod printer;
@@ -20,6 +21,7 @@ macro_rules! err {
 type MalRet = Result<MalVal, String>;
 
 fn eval_ast(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
+//    println!("eval_ast: {}", pr_str(ast.clone()));
     match ast {
         List(l) => {
             let mut new_list: Vec<MalVal> = Vec::new();
@@ -77,8 +79,14 @@ fn is_true(cond: MalVal) -> bool {
     }
 }
 
+fn call_user_fun(fun: &MalUserFn, args: &[MalVal]) -> MalRet{
+    let mut fun_env = fun.env.make_inner_with(&fun.binds, args)?;
+    Ok(EVAL(&fun.body, &mut fun_env)?)
+}
+
 #[allow(non_snake_case)]
 fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
+//    println!("    EVAL: {}", pr_str(ast.clone()));
     match ast {
         List(l) => {
             if l.is_empty() {
@@ -91,7 +99,7 @@ fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
                     match tok.as_str() {
                         "def!" => {
                             let (name, args) = rest.split_first().unwrap();
-                            match name {
+                            return match name {
                                 Sym(s) => {
                                     let val = EVAL(&args[0], menv)?;
                                     menv.set(s.clone(), val.clone());
@@ -103,7 +111,7 @@ fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
                         "let*" => {
                             let binds = &rest[0];
                             let form  = &rest[1];
-                            match binds {
+                            return match binds {
                                 List(bl) | Vector(bl) => {
                                     let mut inner_env = menv.make_inner();
                                     make_env(bl, &mut inner_env)?;
@@ -117,11 +125,11 @@ fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
                             for elem in leading {
                                 EVAL(&elem, menv)?;
                             }
-                            Ok(EVAL(&last, menv)?)
+                            return Ok(EVAL(&last, menv)?)
                         }
                         "if" => {
                             // rest[0] = cond, rest[1] = true branch, rest[2] = false branch
-                            if is_true(EVAL(&rest[0], menv)?) {
+                            return if is_true(EVAL(&rest[0], menv)?) {
                                 Ok(EVAL(&rest[1], menv)?)
                             }
                             else if rest.len() > 2 {
@@ -131,22 +139,38 @@ fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
                                 Ok(Nil)
                             }
                         }
-                        _ => {
-                            if let List(fcall) = eval_ast(ast, menv)? {
-                                let (fun, args) = fcall.split_first().unwrap();
-                                match fun {
-                                    Fun(f) => f(args),
-                                    _ => err!("Tried to call function on non-Fun")
+                        "fn*" => {
+                            let binds = &rest[0];
+                            let body  = &rest[1];
+                            return match binds {
+                                List(bl) | Vector(bl) => {
+                                    Ok(
+                                        UserFun(
+                                            MalUserFn {
+                                                binds: bl.clone(),
+                                                body:  Rc::new(body.clone()),
+                                                env:   menv.clone()
+                                            }
+                                        )
+                                    )
                                 }
-                            }
-                            else {
-                                err!("Somehow eval_ast(List) didn't return a list?")
+                                _ => err!("First elem of fn* wasn't a list/vec")
                             }
                         }
+                        _ => { /* fallthrough to function call */ }
+                    }
+                }
+
+                if let List(fcall) = eval_ast(ast, menv)? {
+                    let (fun, args) = fcall.split_first().unwrap();
+                    match fun {
+                        CoreFun(f) => f(args),
+                        UserFun(f) => call_user_fun(f, args),
+                        _ => err!("Tried to call function on non-Fun")
                     }
                 }
                 else {
-                    Err(format!("got non-sym '{}' at the head of a list?", pr_str(sym.clone())))
+                    err!("Somehow eval_ast(List) didn't return a list?")
                 }
             }
         }
@@ -203,10 +227,10 @@ fn mal_div(args: &[MalVal]) -> MalRet {
 
 fn main() {
     let mut repl_env = MalEnv { outer: None, data: HashMap::new() };
-    repl_env.set("+".to_string(), Fun(mal_add));
-    repl_env.set("-".to_string(), Fun(mal_sub));
-    repl_env.set("*".to_string(), Fun(mal_mul));
-    repl_env.set("/".to_string(), Fun(mal_div));
+    repl_env.set("+".to_string(), CoreFun(mal_add));
+    repl_env.set("-".to_string(), CoreFun(mal_sub));
+    repl_env.set("*".to_string(), CoreFun(mal_mul));
+    repl_env.set("/".to_string(), CoreFun(mal_div));
 
     loop {
         print!("user> ");

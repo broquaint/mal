@@ -1,8 +1,17 @@
 use std::rc::Rc;
 use std::collections::HashMap;
 
+use env::MalEnv;
+
 type MalRet = Result<MalVal, String>;
-pub type MalFn = fn(&[MalVal]) -> MalRet;
+pub type MalFnSig = fn(&[MalVal]) -> MalRet;
+
+#[derive(Clone)]
+pub struct MalUserFn {
+    pub binds: Rc<Vec<MalVal>>,
+    pub body:  Rc<MalVal>,
+    pub env:   MalEnv,
+}
 
 #[derive(Clone)]
 pub enum MalVal {
@@ -14,5 +23,6 @@ pub enum MalVal {
     List(Rc<Vec<MalVal>>),
     Vector(Rc<Vec<MalVal>>),
     Map(Rc<HashMap<String, MalVal>>),
-    Fun(MalFn)
+    UserFun(MalUserFn),
+    CoreFun(MalFnSig),
 }

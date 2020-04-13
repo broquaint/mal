@@ -1,4 +1,4 @@
-use types::MalVal::{self, Int, Sym, Bool, Nil, Str, List, Vector, Map, Fun};
+use types::MalVal::{self, *};
 use reader::{KW_PREFIX};
 
 use regex::{Regex, Captures};
@@ -37,6 +37,6 @@ pub fn pr_str(val: MalVal) -> String {
         Map(m) => format!("{{{}}}", m.iter()
                           .map(|(k,v)| format!("{} {}", malstr_as_string(k.clone()), pr_str(v.clone())))
                           .collect::<Vec<String>>().join(" ")),
-        Fun(_f) => String::from("#<fun>"),
+        CoreFun(_) | UserFun(_) => String::from("#<function>"),
     }
 }
