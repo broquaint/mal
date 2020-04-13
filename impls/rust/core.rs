@@ -73,38 +73,29 @@ fn compare_maps(this: &Rc<HashMap<String, MalVal>>, that: &Rc<HashMap<String, Ma
         })
 }
 
+fn int_op(args: &[MalVal], fun: fn(i64, i64) -> i64) -> MalRet {
+    match (&args[0], &args[1]) {
+        (Int(a), Int(b)) => Ok(Int(fun(*a, *b))),
+        _ => err!("Can only operate on two ints")
+    }
+}
+
+fn cmp_op(args: &[MalVal], fun: fn(i64, i64) -> bool) -> MalRet {
+    match (&args[0], &args[1]) {
+        (Int(a), Int(b)) => Ok(Bool(fun(*a, *b))),
+        _ => err!("Can only compare two ints")
+    }
+}
+
 pub fn core_ns() -> HashMap<String, MalVal> {
     let mut ns = HashMap::new();
 
     let mut add = |name, fun| { add_to_core(&mut ns, name, fun) };
 
-    add("+", |args| {
-        match (&args[0], &args[1]) {
-            (Int(a), Int(b)) => Ok(MalVal::Int(a + b)),
-            _ => err!("Can only add two Ints!")
-        }
-    });
-
-    add("-", |args| {
-        match (&args[0], &args[1]) {
-            (Int(a), Int(b)) => Ok(MalVal::Int(a - b)),
-            _ => err!("Can only subtract two Ints!")
-        }
-    });
-
-    add("*", |args| {
-        match (&args[0], &args[1]) {
-            (Int(a), Int(b)) => Ok(MalVal::Int(a * b)),
-            _ => err!("Can only multiply two Ints!")
-        }
-    });
-
-    add("/", |args| {
-        match (&args[0], &args[1]) {
-            (Int(a), Int(b)) => Ok(MalVal::Int(a / b)),
-            _ => err!("Can only divide two Ints!")
-        }
-    });
+    add("+", |args| { int_op(args, |a,b| { a + b }) });
+    add("-", |args| { int_op(args, |a,b| { a - b }) });
+    add("*", |args| { int_op(args, |a,b| { a * b }) });
+    add("/", |args| { int_op(args, |a,b| { a / b }) });
 
     add("pr-str", |args| {
         Ok(Str(_pr_str(args)))
@@ -147,6 +138,11 @@ pub fn core_ns() -> HashMap<String, MalVal> {
     add("=", |args| {
         Ok(Bool(is_equal(args)))
     });
+
+    add("<",  |args| { cmp_op(args, |a,b| { a <  b }) });
+    add("<=", |args| { cmp_op(args, |a,b| { a <= b }) });
+    add(">",  |args| { cmp_op(args, |a,b| { a >  b }) });
+    add(">=", |args| { cmp_op(args, |a,b| { a >= b }) });
 
     return ns
 }
