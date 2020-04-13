@@ -21,7 +21,7 @@ macro_rules! err {
 type MalRet = Result<MalVal, String>;
 
 fn eval_ast(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
-//    println!("eval_ast: {}", pr_str(ast.clone()));
+//    println!("eval_ast: {}", pr_str(ast.clone(), true));
     match ast {
         List(l) => {
             let mut new_list: Vec<MalVal> = Vec::new();
@@ -86,7 +86,7 @@ fn call_user_fun(fun: &MalUserFn, args: &[MalVal]) -> MalRet{
 
 #[allow(non_snake_case)]
 fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
-//    println!("    EVAL: {}", pr_str(ast.clone()));
+//    println!("    EVAL: {}", pr_str(ast.clone(), true));
     match ast {
         List(l) => {
             if l.is_empty() {
@@ -180,7 +180,7 @@ fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
 
 #[allow(non_snake_case)]
 fn PRINT(code: &MalVal) -> String {
-    pr_str(code.clone()) // TODO Don't be so lazy with clone.
+    pr_str(code.clone(), true) // TODO Don't be so lazy with clone.
 }
 
 #[allow(non_snake_case)]
