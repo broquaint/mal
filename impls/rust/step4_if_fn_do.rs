@@ -91,7 +91,7 @@ fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
                                 },
                                 _ => err!("First elem of def! wasn't a Sym")
                             }
-                        },
+                        }
                         "let*" => {
                             let binds = &rest[0];
                             let form  = &rest[1];
@@ -103,6 +103,13 @@ fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
                                 }
                                 _ => err!("First elem of let* wasn't a list/vec")
                             }
+                        }
+                        "do" => {
+                            let(last, leading) = rest.split_last().unwrap();
+                            for elem in leading {
+                                EVAL(&elem, menv)?;
+                            }
+                            Ok(EVAL(&last, menv)?)
                         }
                         _ => {
                             if let List(fcall) = eval_ast(ast, menv)? {
