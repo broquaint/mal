@@ -205,6 +205,10 @@ fn main() {
         repl_env.set(k.clone(), v.clone());
     }
 
+    if let Err(e) = rep("(def! not (fn* (a) (if a false true)))".to_string(), &mut repl_env) {
+        println!("Failed to eval not: {}", e);
+    }
+
     loop {
         print!("user> ");
         io::stdout().flush().unwrap();
