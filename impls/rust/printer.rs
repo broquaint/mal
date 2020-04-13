@@ -1,4 +1,4 @@
-use types::MalVal::{self, Int, Sym, Nil, Str, List, Vector, Map, Fun};
+use types::MalVal::{self, Int, Sym, Bool, Nil, Str, List, Vector, Map, Fun};
 use reader::{KW_PREFIX};
 
 use regex::{Regex, Captures};
@@ -23,6 +23,7 @@ pub fn pr_str(val: MalVal) -> String {
     match val {
         Int(n) => n.to_string(),
         Sym(s) => s,
+        Bool(b) => (if b { "true" } else { "false" }).to_string(),
         Nil  => "nil".to_string(),
         Str(s) => malstr_as_string(s),
         List(l) => format!("({})", l.iter()
