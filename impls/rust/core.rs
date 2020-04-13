@@ -17,33 +17,10 @@ macro_rules! core_fn {
 }
  */
 
-fn mal_add(args: &[MalVal]) -> MalRet {
-    match (&args[0], &args[1]) {
-        (Int(a), Int(b)) => Ok(MalVal::Int(a + b)),
-        _ => err!("Can only add two Ints!")
-    }
-}
+type MalFnSig = fn(&[MalVal]) -> MalRet;
 
-
-fn mal_sub(args: &[MalVal]) -> MalRet {
-    match (&args[0], &args[1]) {
-        (Int(a), Int(b)) => Ok(MalVal::Int(a - b)),
-        _ => err!("Can only subtract two Ints!")
-    }
-}
-
-fn mal_mul(args: &[MalVal]) -> MalRet {
-    match (&args[0], &args[1]) {
-        (Int(a), Int(b)) => Ok(MalVal::Int(a * b)),
-        _ => err!("Can only multiply two Ints!")
-    }
-}
-
-fn mal_div(args: &[MalVal]) -> MalRet {
-    match (&args[0], &args[1]) {
-        (Int(a), Int(b)) => Ok(MalVal::Int(a / b)),
-        _ => err!("Can only divide two Ints!")
-    }
+fn add_to_core(ns: &mut HashMap<String, MalVal>, name: &str, fun: MalFnSig) {
+    ns.insert(name.to_string(), CoreFun(fun));
 }
 
 fn _pr_str(args: &[MalVal]) -> String {
@@ -58,34 +35,56 @@ fn _str(args: &[MalVal], joiner: &str) -> String {
         .join(joiner)
 }
 
-fn mal_pr_str(args: &[MalVal]) -> MalRet {
-    Ok(Str(_pr_str(args)))
-}
-
-fn mal_str(args: &[MalVal]) -> MalRet {
-    Ok(Str(_str(args, "")))
-}
-
-fn prn(args: &[MalVal]) -> MalRet {
-    println!("{}", _pr_str(args));
-    Ok(Nil)
-}
-
-fn mal_println(args: &[MalVal]) -> MalRet {
-    println!("{}", _str(args, " "));
-    Ok(Nil)
-}
-
 pub fn core_ns() -> HashMap<String, MalVal> {
     let mut ns = HashMap::new();
-    ns.insert("+".to_string(), CoreFun(mal_add));
-    ns.insert("-".to_string(), CoreFun(mal_sub));
-    ns.insert("*".to_string(), CoreFun(mal_mul));
-    ns.insert("/".to_string(), CoreFun(mal_div));
 
-    ns.insert("pr-str".to_string(), CoreFun(mal_pr_str));
-    ns.insert("str".to_string(), CoreFun(mal_str));
-    ns.insert("prn".to_string(), CoreFun(prn));
-    ns.insert("println".to_string(), CoreFun(mal_println));
+    let mut add = |name, fun| { add_to_core(&mut ns, name, fun) };
+
+    add("+", |args| {
+        match (&args[0], &args[1]) {
+            (Int(a), Int(b)) => Ok(MalVal::Int(a + b)),
+            _ => err!("Can only add two Ints!")
+        }
+    });
+
+    add("-", |args| {
+        match (&args[0], &args[1]) {
+            (Int(a), Int(b)) => Ok(MalVal::Int(a - b)),
+            _ => err!("Can only subtract two Ints!")
+        }
+    });
+
+    add("*", |args| {
+        match (&args[0], &args[1]) {
+            (Int(a), Int(b)) => Ok(MalVal::Int(a * b)),
+            _ => err!("Can only multiply two Ints!")
+        }
+    });
+
+    add("/", |args| {
+        match (&args[0], &args[1]) {
+            (Int(a), Int(b)) => Ok(MalVal::Int(a / b)),
+            _ => err!("Can only divide two Ints!")
+        }
+    });
+
+    add("pr-str", |args| {
+        Ok(Str(_pr_str(args)))
+    });
+
+    add("str", |args| {
+        Ok(Str(_str(args, "")))
+    });
+
+    add("prn", |args| {
+        println!("{}", _pr_str(args));
+        Ok(Nil)
+    });
+
+    add("println", |args| {
+        println!("{}", _str(args, " "));
+        Ok(Nil)
+    });
+
     return ns
 }
