@@ -32,7 +32,12 @@ impl MalEnv {
                         }
                     }
                     else {
-                        params.insert(s.clone(), args[idx].clone());
+                        if idx < args.len() {
+                            params.insert(s.clone(), args[idx].clone());
+                        }
+                        else {
+                            return Err(format!("have {} binds but got {} args", binds.len(), args.len()));
+                        }
                     }
                 }
                 _ => return Err("Got a non-sym in fn*".to_string())
