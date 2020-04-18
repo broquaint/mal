@@ -83,13 +83,8 @@ fn is_true(cond: MalVal) -> bool {
 }
 
 fn call_user_fun(fun: &MalUserFn, args: &[MalVal]) -> MalRet {
-    if let Some(env_ref) = fun.env.upgrade() {
-        let fun_env = Rc::new(env_ref.make_inner_with(&fun.binds, args)?);
-        Ok(EVAL(&fun.body, &fun_env)?)
-    }
-    else {
-        err!("The env disappeared?!")
-    }
+    let fun_env = Rc::new(fun.env.make_inner_with(&fun.binds, args)?);
+    Ok(EVAL(&fun.body, &fun_env)?)
 }
 
 #[allow(non_snake_case)]
@@ -157,7 +152,7 @@ fn EVAL(ast: &MalVal, menv: &Rc<MalEnv>) -> MalRet {
                                             MalUserFn {
                                                 binds: bl.clone(),
                                                 body:  Rc::new(body.clone()),
-                                                env:   Rc::downgrade(menv)
+                                                env:   Rc::clone(menv)
                                             }
                                         )
                                     )
