@@ -1,6 +1,7 @@
 use std::io::{self, Write};
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::cell::RefCell;
 
 extern crate regex;
 
@@ -22,7 +23,7 @@ macro_rules! err {
 
 type MalRet = Result<MalVal, String>;
 
-fn eval_ast(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
+fn eval_ast(ast: &MalVal, menv: &Rc<MalEnv>) -> MalRet {
 //    println!("eval_ast: {}", pr_str(ast.clone(), true));
     match ast {
         List(l) => {
@@ -54,7 +55,7 @@ fn eval_ast(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
     }
 }
 
-fn make_env(binds: &Rc<Vec<MalVal>>, new_env: &mut MalEnv) -> Result<bool, String> {
+fn make_env(binds: &Rc<Vec<MalVal>>, new_env: &Rc<MalEnv>) -> Result<bool, String> {
     if binds.len() % 2 != 0 {
         return err!("binds for let* wasn't even")
     }
@@ -81,13 +82,18 @@ fn is_true(cond: MalVal) -> bool {
     }
 }
 
-fn call_user_fun(fun: &MalUserFn, args: &[MalVal]) -> MalRet{
-    let mut fun_env = fun.env.make_inner_with(&fun.binds, args)?;
-    Ok(EVAL(&fun.body, &mut fun_env)?)
+fn call_user_fun(fun: &MalUserFn, args: &[MalVal]) -> MalRet {
+    if let Some(env_ref) = fun.env.upgrade() {
+        let fun_env = Rc::new(env_ref.make_inner_with(&fun.binds, args)?);
+        Ok(EVAL(&fun.body, &fun_env)?)
+    }
+    else {
+        err!("The env disappeared?!")
+    }
 }
 
 #[allow(non_snake_case)]
-fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
+fn EVAL(ast: &MalVal, menv: &Rc<MalEnv>) -> MalRet {
 //    println!("    EVAL: {}", pr_str(ast.clone(), true));
     match ast {
         List(l) => {
@@ -115,9 +121,9 @@ fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
                             let form  = &rest[1];
                             return match binds {
                                 List(bl) | Vector(bl) => {
-                                    let mut inner_env = menv.make_inner();
-                                    make_env(bl, &mut inner_env)?;
-                                    Ok(EVAL(form, &mut inner_env)?)
+                                    let inner_env = Rc::new(menv.make_inner());
+                                    make_env(bl, &inner_env)?;
+                                    Ok(EVAL(form, &inner_env)?)
                                 }
                                 _ => err!("First elem of let* wasn't a list/vec")
                             }
@@ -151,7 +157,7 @@ fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
                                             MalUserFn {
                                                 binds: bl.clone(),
                                                 body:  Rc::new(body.clone()),
-                                                env:   menv.clone()
+                                                env:   Rc::downgrade(menv)
                                             }
                                         )
                                     )
@@ -163,7 +169,7 @@ fn EVAL(ast: &MalVal, menv: &mut MalEnv) -> MalRet {
                     }
                 }
 
-                if let List(fcall) = eval_ast(ast, menv)? {
+                if let List(fcall) = eval_ast(ast, &menv)? {
                     let (fun, args) = fcall.split_first().unwrap();
                     match fun {
                         CoreFun(f) => f(args),
@@ -190,7 +196,7 @@ fn READ(code: String) -> Result<MalVal, String> {
     read_str(code)
 }
 
-fn rep(code: String, menv: &mut MalEnv) -> Result<String, String> {
+fn rep(code: String, menv: &Rc<MalEnv>) -> Result<String, String> {
     let ast = READ(code)?;
     match EVAL(&ast, menv) {
         Ok(ast) => Ok(PRINT(&ast)),
@@ -199,13 +205,13 @@ fn rep(code: String, menv: &mut MalEnv) -> Result<String, String> {
 }
 
 fn main() {
-    let mut repl_env = MalEnv { outer: None, data: HashMap::new() };
+    let repl_env = Rc::new(MalEnv { outer: None, data: Rc::new(RefCell::new(HashMap::new())) });
 
     for (k,v) in &core_ns() {
         repl_env.set(k.clone(), v.clone());
     }
 
-    if let Err(e) = rep("(def! not (fn* (a) (if a false true)))".to_string(), &mut repl_env) {
+    if let Err(e) = rep("(def! not (fn* (a) (if a false true)))".to_string(), &repl_env) {
         println!("Failed to eval not: {}", e);
     }
 
@@ -216,7 +222,7 @@ fn main() {
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
             Ok(_)  => {
-                let result = rep(input, &mut repl_env);
+                let result = rep(input, &repl_env);
                 println!("{}", match result { Ok(s) => s, Err(e) => e });
             }
             Err(_) => { break; }
