@@ -1,17 +1,18 @@
 use std::rc::Rc;
+use std::cell::RefCell;
 use std::collections::HashMap;
-
+use std::ops::Deref;
 use types::MalVal::{self, List, Sym};
 
 #[derive(Clone)]
 pub struct MalEnv {
     pub outer: Option<Box<MalEnv>>,
-    pub data:  HashMap<String, MalVal>
+    pub data:  Rc<RefCell<HashMap<String, MalVal>>>
 }
 
 impl MalEnv {
     pub fn make_inner(&self) -> MalEnv {
-        MalEnv { outer: Some(Box::new(self.clone())), data: HashMap::new() }
+        MalEnv { outer: Some(Box::new(self.clone())), data: Rc::new(RefCell::new(HashMap::new())) }
     }
 
     pub fn make_inner_with(&self, binds: &Rc<Vec<MalVal>>, args: &[MalVal]) -> Result<MalEnv, String> {
@@ -38,15 +39,15 @@ impl MalEnv {
             }
         }
 
-        Ok(MalEnv { outer: Some(Box::new(self.clone())), data: params })
+        Ok(MalEnv { outer: Some(Box::new(self.clone())), data: Rc::new(RefCell::new(params)) })
     }
 
-    pub fn set(&mut self, k: String, v: MalVal) {
-        self.data.insert(k, v.clone());
+    pub fn set(&self, k: String, v: MalVal) {
+        self.data.deref().borrow_mut().insert(k, v.clone());
     }
 
     pub fn find(&self, k: &String) -> Option<&MalEnv> {
-        if self.data.contains_key(k) {
+        if self.data.borrow().contains_key(k) {
             Some(self)
         }
         else if let Some(outer_env) = &self.outer {
@@ -59,7 +60,7 @@ impl MalEnv {
 
     pub fn get(&self, k: &String) -> Result<MalVal, String> {
         if let Some(menv) = self.find(k) {
-            Ok(menv.data.get(k).unwrap().clone())
+            Ok(menv.data.borrow().get(k).unwrap().clone())
         }
         else {
             Err(format!("'{}' not found", k))
