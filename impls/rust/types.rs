@@ -1,5 +1,4 @@
 use std::rc::Rc;
-use std::rc::Weak;
 use std::collections::HashMap;
 
 use env::MalEnv;
@@ -11,7 +10,7 @@ pub type MalFnSig = fn(&[MalVal]) -> MalRet;
 pub struct MalUserFn {
     pub binds: Rc<Vec<MalVal>>,
     pub body:  Rc<MalVal>,
-    pub env:   Weak<MalEnv>,
+    pub env:   Rc<MalEnv>,
 }
 
 #[derive(Clone)]
