@@ -55,25 +55,6 @@ fn eval_ast(ast: &MalVal, menv: &Rc<MalEnv>) -> MalRet {
     }
 }
 
-fn make_env(binds: &Rc<Vec<MalVal>>, new_env: &Rc<MalEnv>) -> Result<bool, String> {
-    if binds.len() % 2 != 0 {
-        return err!("binds for let* wasn't even")
-    }
-
-    for bind in binds.chunks(2) {
-        match &bind[0] {
-            Sym(k) => {
-                let v = EVAL(&bind[1], new_env)?;
-                new_env.set(k.clone(), v);
-            }
-            _ => return err!("bind in let* wasn't a symbol")
-        }
-    }
-
-    // XXX Bleurgh, really just want early error on non-sym.
-    Ok(true)
-}
-
 fn is_true(cond: MalVal) -> bool {
     match cond {
         Bool(b) => b,
@@ -82,9 +63,64 @@ fn is_true(cond: MalVal) -> bool {
     }
 }
 
+fn make_env(binds: &Rc<Vec<MalVal>>, outer_env: &Rc<MalEnv>) -> Result<Rc<MalEnv>, String> {
+    let new_env = Rc::new(MalEnv {
+        outer: Some(Rc::clone(outer_env)),
+        data:  Rc::new(RefCell::new(HashMap::new()))
+    });
+
+    if binds.len() % 2 != 0 {
+        return err!("binds for let* wasn't even")
+    }
+
+    for bind in binds.chunks(2) {
+        match &bind[0] {
+            Sym(k) => {
+                let v = EVAL(&bind[1], &new_env)?;
+                new_env.set(k.clone(), v);
+            }
+            _ => return err!("bind in let* wasn't a symbol")
+        }
+    }
+
+    Ok(new_env)
+}
+
+fn make_fun_env(env: &Rc<MalEnv>, binds: &Rc<Vec<MalVal>>, args: &[MalVal]) -> Result<MalEnv, String> {
+    let mut params = HashMap::new();
+
+    for idx in 0 .. binds.len() {
+        match &binds[idx] {
+            Sym(s) => {
+                if s == "&" {
+                    if let Sym(rest_bind) = &binds[idx + 1] {
+                        let rest_args = &args[idx .. args.len()];
+                        params.insert(rest_bind.clone(), List(Rc::new(rest_args.to_vec())));
+                        break;
+                    }
+                    else {
+                        return err!("Got a non-sym after & in binds")
+                    }
+                }
+                else {
+                    if idx < args.len() {
+                        params.insert(s.clone(), args[idx].clone());
+                    }
+                    else {
+                        return Err(format!("have {} binds but got {} args", binds.len(), args.len()));
+                    }
+                }
+            }
+            _ => return err!("Got a non-sym in fn*")
+        }
+    }
+
+    Ok(MalEnv { outer: Some(Rc::clone(env)), data: Rc::new(RefCell::new(params)) })
+}
+
 fn call_user_fun(fun: &MalUserFn, args: &[MalVal]) -> MalRet {
-    let fun_env = Rc::new(fun.env.make_inner_with(&fun.binds, args)?);
-    Ok(EVAL(&fun.body, &fun_env)?)
+    let inner_env = make_fun_env(&fun.env, &fun.binds, args)?;
+    Ok(EVAL(&fun.body, &Rc::new(inner_env))?)
 }
 
 #[allow(non_snake_case)]
@@ -116,8 +152,7 @@ fn EVAL(ast: &MalVal, menv: &Rc<MalEnv>) -> MalRet {
                             let form  = &rest[1];
                             return match binds {
                                 List(bl) | Vector(bl) => {
-                                    let inner_env = Rc::new(menv.make_inner());
-                                    make_env(bl, &inner_env)?;
+                                    let inner_env = make_env(bl, menv)?;
                                     Ok(EVAL(form, &inner_env)?)
                                 }
                                 _ => err!("First elem of let* wasn't a list/vec")
