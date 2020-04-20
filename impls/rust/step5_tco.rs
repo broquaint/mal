@@ -132,8 +132,8 @@ fn call_user_fun(fun: &MalUserFn, args: &[MalVal]) -> MalRet {
 fn EVAL(cur_ast: &MalVal, cur_env: &Rc<MalEnv>) -> MalRet {
     //    println!("    EVAL: {}", pr_str(ast.clone(), true));
 
-    let ast  = Cell::new(cur_ast);
-    let menv = Cell::new(cur_env);
+    let ast = Cell::new(cur_ast);
+    let env = RefCell::new(Rc::clone(cur_env));
 
     'eval_loop: loop {
         match ast.get() {
@@ -150,35 +150,35 @@ fn EVAL(cur_ast: &MalVal, cur_env: &Rc<MalEnv>) -> MalRet {
                                 let (name, args) = rest.split_first().unwrap();
                                 return match name {
                                     Sym(s) => {
-                                        let val = EVAL(&args[0], menv.get())?;
-                                        menv.get().set(s.clone(), val.clone());
+                                        let val = EVAL(&args[0], &env.borrow())?;
+                                        env.borrow().set(s.clone(), val.clone());
                                         Ok(val)
                                     },
                                     _ => err!("First elem of def! wasn't a Sym")
                                 }
                             }
-                            // "let*" => {
-                            //     let binds = &rest[0];
-                            //     let form = &rest[1];
-                            //     match binds {
-                            //         List(bl) | Vector(bl) => {
-                            //             let let_env = make_env(bl, menv.get())?;
-                            //             menv.swap(&Cell::new(&let_env));
-                            //             ast.swap(&Cell::new(form));
-                            //             continue 'eval_loop
-                            //         }
-                            //         _ => return err!("First elem of let* wasn't a list/vec")
-                            //     }
-                            // }
+                            "let*" => {
+                                let binds = &rest[0];
+                                let form = &rest[1];
+                                match binds {
+                                    List(bl) | Vector(bl) => {
+                                        let new_env = make_env(bl, &env.borrow())?;
+                                        env.replace(new_env);
+                                        ast.replace(form);
+                                        continue 'eval_loop
+                                    }
+                                    _ => return err!("First elem of let* wasn't a list/vec")
+                                }
+                            }
                             "do" => {
                                 let(last, leading) = rest.split_last().unwrap();
-                                eval_ast(&mlist!(leading.to_vec()), menv.get())?;
-                                ast.swap(&Cell::new(&last));
+                                eval_ast(&mlist!(leading.to_vec()), &env.borrow())?;
+                                ast.replace(&last);
                                 continue 'eval_loop
                             }
                             "if" => {
                                 // rest[0] = cond, rest[1] = true branch, rest[2] = false branch
-                                let next_ast = if is_true(EVAL(&rest[0], menv.get())?) {
+                                let next_ast = if is_true(EVAL(&rest[0], &env.borrow())?) {
                                     &rest[1]
                                 }
                                 else if rest.len() > 2 {
@@ -187,7 +187,7 @@ fn EVAL(cur_ast: &MalVal, cur_env: &Rc<MalEnv>) -> MalRet {
                                 else {
                                    &Nil
                                 };
-                                ast.swap(&Cell::new(next_ast));
+                                ast.replace(next_ast);
                                 continue 'eval_loop
                             }
                             "fn*" => {
@@ -200,7 +200,7 @@ fn EVAL(cur_ast: &MalVal, cur_env: &Rc<MalEnv>) -> MalRet {
                                                 MalUserFn {
                                                     binds: bl.clone(),
                                                     body:  Rc::new(body.clone()),
-                                                    env:   Rc::clone(menv.get())
+                                                    env:   Rc::clone(&env.borrow())
                                                 }
                                             )
                                         )
@@ -212,8 +212,7 @@ fn EVAL(cur_ast: &MalVal, cur_env: &Rc<MalEnv>) -> MalRet {
                         }
                     }
 
-                    // XXX Drop & on &menv?
-                    return if let List(fcall) = eval_ast(ast.get(), menv.get())? {
+                    return if let List(fcall) = eval_ast(ast.get(), &env.borrow())? {
                         let (fun, args) = fcall.split_first().unwrap();
                         match fun {
                             CoreFun(f) => f(args),
@@ -226,7 +225,7 @@ fn EVAL(cur_ast: &MalVal, cur_env: &Rc<MalEnv>) -> MalRet {
                     }
                 }
             }
-            v => return eval_ast(&v, menv.get())
+            v => return eval_ast(&v, &env.borrow())
         }
     }
 }
