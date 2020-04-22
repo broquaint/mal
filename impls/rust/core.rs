@@ -1,6 +1,7 @@
 use std::rc::Rc;
 use std::collections::HashMap;
 
+use reader::read_str;
 use printer::pr_str;
 use types::MalVal::{self, *};
 
@@ -143,6 +144,13 @@ pub fn core_ns() -> HashMap<String, MalVal> {
     add("<=", |args| { cmp_op(args, |a,b| { a <= b }) });
     add(">",  |args| { cmp_op(args, |a,b| { a >  b }) });
     add(">=", |args| { cmp_op(args, |a,b| { a >= b }) });
+
+    add("read-str", |args| {
+        match &args[0] {
+            Str(s) => read_str(s.clone()),
+            _ => err!("Can't read-str a non-string")
+        }
+    });
 
     return ns
 }
