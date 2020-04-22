@@ -1,3 +1,4 @@
+use std::fs;
 use std::rc::Rc;
 use std::collections::HashMap;
 
@@ -88,6 +89,14 @@ fn cmp_op(args: &[MalVal], fun: fn(i64, i64) -> bool) -> MalRet {
     }
 }
 
+fn read_file(path: &String) -> MalRet {
+    let res = fs::read(path.as_str());
+    match res {
+        Ok(data) => Ok(Str(String::from_utf8_lossy(&data).to_string())),
+        Err(e) => Err(e.to_string())
+    }
+}
+
 pub fn core_ns() -> HashMap<String, MalVal> {
     let mut ns = HashMap::new();
 
@@ -149,6 +158,13 @@ pub fn core_ns() -> HashMap<String, MalVal> {
         match &args[0] {
             Str(s) => read_str(s.clone()),
             _ => err!("Can't read-str a non-string")
+        }
+    });
+
+    add("slurp", |args| {
+        match &args[0] {
+            Str(s) => read_file(s),
+            _ => err!("Can't slurp a non-str")
         }
     });
 
