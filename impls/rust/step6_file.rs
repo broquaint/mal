@@ -16,17 +16,12 @@ use printer::pr_str;
 mod env;
 use env::MalEnv;
 mod core;
-use core::core_ns;
-
-macro_rules! err {
-    ($e:expr) => { Err($e.to_string()) }
-}
+use core::core_ns; // Also exports err! macro.
+use core::MalRet;
 
 macro_rules! mlist {
     ($e:expr) => { List(Rc::new($e)) }
 }
-
-type MalRet = Result<MalVal, String>;
 
 fn eval_ast(ast: &MalVal, menv: &Rc<MalEnv>) -> MalRet {
 //    println!("eval_ast: {}", pr_str(ast.clone(), true));
@@ -236,7 +231,7 @@ fn PRINT(code: &MalVal) -> String {
 }
 
 #[allow(non_snake_case)]
-fn READ(code: String) -> Result<MalVal, String> {
+fn READ(code: String) -> MalRet {
     read_str(code)
 }
 
