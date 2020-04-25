@@ -42,3 +42,28 @@ pub fn pr_str(val: MalVal, print_readably: bool) -> String {
         CoreFun(_) | UserFun(_) => String::from("#<function>"),
     }
 }
+
+pub fn rs_pr_str(val: MalVal) -> String {
+    // Helper to avoid repeating print_readably.
+    let pr = |v| { rs_pr_str(v) };
+    match val {
+        Int(n) => format!("Int({})", n.to_string()),
+        Sym(s) => format!("Sym({})", s),
+        Bool(b) => format!("Bool({})", (if b { "true" } else { "false" }).to_string()),
+        Nil  => "Nil(nil)".to_string(),
+        Str(s) => format!("Str({})", malstr_as_string(s)),
+        List(l) => format!("List({})", l.iter()
+                           .map(|v| { pr(v.clone()) })
+                           .collect::<Vec<String>>().join(" ")),
+        Vector(l) => format!("Vector[{}]", l.iter()
+                           .map(|v| { pr(v.clone()) })
+                             .collect::<Vec<String>>().join(" ")),
+        // It seems {{}} is the \ of format!()
+        // https://doc.rust-lang.org/std/fmt/index.html#escaping
+        Map(m) => format!("Map{{{}}}", m.iter()
+                          .map(|(k,v)| format!("{} {}", malstr_as_string(k.clone()), pr(v.clone())))
+                          .collect::<Vec<String>>().join(" ")),
+        CoreFun(_) => String::from("#<core function>"),
+        UserFun(_) => String::from("#<user function>"),
+    }
+}

@@ -4,10 +4,13 @@ use std::collections::HashMap;
 
 use reader::read_str;
 use printer::pr_str;
+use printer::rs_pr_str;
 use types::MalVal::{self, *};
+use types::MalFnSig;
 
-type MalRet = Result<MalVal, String>;
+pub type MalRet = Result<MalVal, String>;
 
+#[macro_export]
 macro_rules! err {
     ($e:expr) => { Err($e.to_string()) }
 }
@@ -19,12 +22,6 @@ macro_rules! core_fn {
     }
 }
  */
-
-type MalFnSig = fn(&[MalVal]) -> MalRet;
-
-fn add_to_core(ns: &mut HashMap<String, MalVal>, name: &str, fun: MalFnSig) {
-    ns.insert(name.to_string(), CoreFun(fun));
-}
 
 fn _pr_str(args: &[MalVal]) -> String {
     args.iter().map(|v| { pr_str(v.clone(), true) })
@@ -97,6 +94,10 @@ fn read_file(path: &String) -> MalRet {
     }
 }
 
+fn add_to_core(ns: &mut HashMap<String, MalVal>, name: &str, fun: MalFnSig) {
+    ns.insert(name.to_string(), CoreFun(fun));
+}
+
 pub fn core_ns() -> HashMap<String, MalVal> {
     let mut ns = HashMap::new();
 
@@ -118,6 +119,10 @@ pub fn core_ns() -> HashMap<String, MalVal> {
     add("prn", |args| {
         println!("{}", _pr_str(args));
         Ok(Nil)
+    });
+
+    add("dbg", |args| {
+        Ok(Str(rs_pr_str(args[0].clone())))
     });
 
     add("println", |args| {
@@ -154,7 +159,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
     add(">",  |args| { cmp_op(args, |a,b| { a >  b }) });
     add(">=", |args| { cmp_op(args, |a,b| { a >= b }) });
 
-    add("read-str", |args| {
+    add("read-string", |args| {
         match &args[0] {
             Str(s) => read_str(s.clone()),
             _ => err!("Can't read-str a non-string")
