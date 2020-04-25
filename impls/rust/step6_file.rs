@@ -203,6 +203,12 @@ fn EVAL(cur_ast: &MalVal, cur_env: &Rc<MalEnv>) -> MalRet {
                                     _ => err!("First elem of fn* wasn't a list/vec")
                                 }
                             }
+                            "eval" => {
+                                // Get the ast to run EVAL against.
+                                let tmp_ast = EVAL(&rest[0], &env.borrow())?;
+                                // Evaluate the produced AST.
+                                return EVAL(&tmp_ast, &env.borrow());
+                            }
                             _ => { /* fallthrough to function call */ }
                         }
                     }
