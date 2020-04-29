@@ -66,7 +66,8 @@ fn is_true(cond: MalVal) -> bool {
 fn make_env(binds: &Rc<Vec<MalVal>>, outer_env: &Rc<MalEnv>) -> Result<Rc<MalEnv>, String> {
     let new_env = Rc::new(MalEnv {
         outer: Some(Rc::clone(outer_env)),
-        data:  Rc::new(RefCell::new(HashMap::new()))
+        data:  Rc::new(RefCell::new(HashMap::new())),
+        id:    outer_env.id * 2,
     });
 
     if binds.len() % 2 != 0 {
@@ -115,7 +116,7 @@ fn make_fun_env(env: &Rc<MalEnv>, binds: &Rc<Vec<MalVal>>, args: &[MalVal]) -> R
         }
     }
 
-    Ok(MalEnv { outer: Some(Rc::clone(env)), data: Rc::new(RefCell::new(params)) })
+    Ok(MalEnv { outer: Some(Rc::clone(env)), data: Rc::new(RefCell::new(params)), id: env.id * 2 })
 }
 
 fn call_user_fun(fun: &MalUserFn, args: &[MalVal]) -> MalRet {
@@ -125,7 +126,7 @@ fn call_user_fun(fun: &MalUserFn, args: &[MalVal]) -> MalRet {
 
 #[allow(non_snake_case)]
 fn EVAL(cur_ast: &MalVal, cur_env: &Rc<MalEnv>) -> MalRet {
-    //    println!("    EVAL: {}", pr_str(ast.clone(), true));
+//    println!("    EVAL: {}", pr_str(cur_ast.clone(), true));
 
     let ast = Cell::new(cur_ast);
     let env = RefCell::new(Rc::clone(cur_env));
@@ -250,7 +251,7 @@ fn rep(code: String, menv: &Rc<MalEnv>) -> Result<String, String> {
 }
 
 fn main() {
-    let repl_env = Rc::new(MalEnv { outer: None, data: Rc::new(RefCell::new(HashMap::new())) });
+    let repl_env = Rc::new(MalEnv { outer: None, data: Rc::new(RefCell::new(HashMap::new())), id: 1 });
 
     for (k,v) in &core_ns() {
         repl_env.set(k.clone(), v.clone());

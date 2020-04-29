@@ -7,7 +7,8 @@ use types::MalVal;
 #[derive(Clone)]
 pub struct MalEnv {
     pub outer: Option<Rc<MalEnv>>,
-    pub data:  Rc<RefCell<HashMap<String, MalVal>>>
+    pub data:  Rc<RefCell<HashMap<String, MalVal>>>,
+    pub id:    i32
 }
 
 impl MalEnv {
@@ -34,5 +35,15 @@ impl MalEnv {
         else {
             Err(format!("'{}' not found", k))
         }
+    }
+}
+
+impl ToString for MalEnv {
+    fn to_string(&self) -> String {
+        let oenv = match &self.outer {
+            Some(oe) => oe.id.to_string(),
+            None     => "root".to_string(),
+        };
+        format!("MalEnv<id: {}, outer_env: {}>", self.id, oenv)
     }
 }
