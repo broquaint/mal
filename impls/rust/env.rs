@@ -28,6 +28,16 @@ impl MalEnv {
         }
     }
 
+    pub fn root(&self) -> Rc<MalEnv> {
+        if let Some(outer_env) = &self.outer {
+            outer_env.root()
+        }
+        else {
+            // Cloning isn't ideal but it works and that's enough for now.
+            Rc::new(self.clone())
+        }
+    }
+
     pub fn get(&self, k: &String) -> Result<MalVal, String> {
         if let Some(menv) = self.find(k) {
             Ok(menv.data.borrow().get(k).unwrap().clone())
