@@ -250,6 +250,13 @@ fn rep(code: String, menv: &Rc<MalEnv>) -> Result<String, String> {
     }
 }
 
+fn rep_lit(code: &str, env: &Rc<MalEnv>) {
+    if let Err(e) = rep(code.to_string(), env) {
+       println!("Failed to eval '{}': {}", code, e);
+       std::process::exit(1);
+   }
+}
+
 fn main() {
     let repl_env = Rc::new(MalEnv { outer: None, data: Rc::new(RefCell::new(HashMap::new())), id: 1 });
 
@@ -257,9 +264,7 @@ fn main() {
         repl_env.set(k.clone(), v.clone());
     }
 
-    if let Err(e) = rep("(def! not (fn* (a) (if a false true)))".to_string(), &repl_env) {
-        println!("Failed to eval not: {}", e);
-    }
+    rep_lit("(def! not (fn* (a) (if a false true)))", &repl_env);
 
     loop {
         print!("user> ");
