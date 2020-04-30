@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 use env::MalEnv;
@@ -25,4 +26,5 @@ pub enum MalVal {
     Map(Rc<HashMap<String, MalVal>>),
     UserFun(MalUserFn),
     CoreFun(MalFnSig),
+    Atom(Rc<RefCell<MalVal>>),
 }

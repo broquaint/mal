@@ -1,6 +1,5 @@
 use types::MalVal::{self, *};
 use reader::{KW_PREFIX};
-
 use regex::{Regex, Captures};
 
 fn malstr_as_string(s: String) -> String {
@@ -40,6 +39,7 @@ pub fn pr_str(val: MalVal, print_readably: bool) -> String {
                           .map(|(k,v)| format!("{} {}", malstr_as_string(k.clone()), pr(v.clone())))
                           .collect::<Vec<String>>().join(" ")),
         CoreFun(_) | UserFun(_) => String::from("#<function>"),
+        Atom(a) => format!("(atom {})", pr(a.borrow().clone())),
     }
 }
 
@@ -65,5 +65,6 @@ pub fn rs_pr_str(val: MalVal) -> String {
                           .collect::<Vec<String>>().join(" ")),
         CoreFun(_) => String::from("#<core function>"),
         UserFun(_) => String::from("#<user function>"),
+        Atom(a) => format!("Atom(atom {})", pr(a.borrow().clone())),
     }
 }
