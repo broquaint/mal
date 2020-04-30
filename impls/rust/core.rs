@@ -1,5 +1,6 @@
 use std::fs;
 use std::rc::Rc;
+use std::cell::RefCell;
 use std::collections::HashMap;
 
 use reader::read_str;
@@ -14,14 +15,6 @@ pub type MalRet = Result<MalVal, String>;
 macro_rules! err {
     ($e:expr) => { Err($e.to_string()) }
 }
-
-/*
-macro_rules! core_fn {
-    ($func_name:ident, $body:block) => {
-        fn $func_name(args: &MalVal) -> MalRet
-    }
-}
- */
 
 fn _pr_str(args: &[MalVal]) -> String {
     args.iter().map(|v| { pr_str(v.clone(), true) })
@@ -171,6 +164,32 @@ pub fn core_ns() -> HashMap<String, MalVal> {
             Str(s) => read_file(s),
             _ => err!("Can't slurp a non-str")
         }
+    });
+
+    add("atom", |args| {
+        Ok(Atom(Rc::new(RefCell::new(args[0].clone()))))
+    });
+    add("atom?", |args| {
+        Ok(Bool(matches!(args[0], Atom(_))))
+    });
+    add("deref", |args| {
+        match &args[0] {
+            Atom(a) => Ok(a.borrow().clone()),
+            _ => err!("Can't deref a non-atom")
+        }
+    });
+    add("reset!", |args| {
+        match &args[0] {
+            Atom(a) => { Ok(a.replace(args[1].clone())) }
+            _ => err!("Can't reset! a non-atom")
+        }
+    });
+    add("swap!", |args| {
+        Ok(Nil)
+        // match (&args[0], &args[1]) {
+        //     Atom(a) => { Ok(todo!()) }
+        //     _ => err!("Can't swap! a non-atom")
+        // }
     });
 
     return ns
