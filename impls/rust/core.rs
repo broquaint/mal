@@ -266,5 +266,27 @@ pub fn core_ns() -> HashMap<String, MalVal> {
         }
     });
 
+    add("cons", |args| {
+        let mut newlist = vec![args[0].clone()];
+        match &args[1] {
+            List(l) | Vector(l) => {
+                newlist.extend_from_slice(l.as_slice());
+                Ok(mlist![newlist])
+            }
+            _ => err!("second arg of cons must be list/vec")
+        }
+    });
+
+    add("concat", |args| {
+        let mut newlist = vec![];
+        for larg in args {
+            match larg {
+                List(l) | Vector(l) => { newlist.extend_from_slice(l.as_slice()) }
+                _ => return err!("can only concat list/vec")
+            }
+        }
+        Ok(mlist![newlist])
+    });
+
     return ns
 }
