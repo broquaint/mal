@@ -1,3 +1,4 @@
+use std::env::args;
 use std::io::{self, Write};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -229,17 +230,29 @@ fn main() {
     rep_lit("(def! not (fn* (a) (if a false true)))", &repl_env);
     rep_lit("(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\nnil)\")))))", &repl_env);
 
-    loop {
-        print!("user> ");
-        io::stdout().flush().unwrap();
+    let argstar  = "*ARGV*".to_string();
+    let mut argv = args();
+    if argv.len() > 1 {
+        let file = argv.next().unwrap();
+        repl_env.set(
+            argstar, mlist![argv.map(|arg| Str(arg)).collect()]
+        );
+        rep_lit(format!("(load-file {})", file).as_str(), &repl_env)
+    }
+    else {
+        repl_env.set(argstar, mlist![vec![]]);
+        loop {
+            print!("user> ");
+            io::stdout().flush().unwrap();
 
-        let mut input = String::new();
-        match io::stdin().read_line(&mut input) {
-            Ok(_)  => {
-                let result = rep(input, &repl_env);
-                println!("{}", match result { Ok(s) => s, Err(e) => e });
+            let mut input = String::new();
+            match io::stdin().read_line(&mut input) {
+                Ok(_)  => {
+                    let result = rep(input, &repl_env);
+                    println!("{}", match result { Ok(s) => s, Err(e) => e });
+                }
+                Err(_) => { break; }
             }
-            Err(_) => { break; }
         }
     }
 }
