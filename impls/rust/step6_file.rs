@@ -16,12 +16,9 @@ use printer::pr_str;
 mod env;
 use env::MalEnv;
 mod core;
-use core::core_ns; // Also exports err! macro.
+use core::core_ns; // Also exports err!, mlist! macros.
+use core::call_user_fun;
 use core::MalRet;
-
-macro_rules! mlist {
-    ($e:expr) => { List(Rc::new($e)) }
-}
 
 fn eval_ast(ast: &MalVal, menv: &Rc<MalEnv>) -> MalRet {
 //    println!("eval_ast: {}", pr_str(ast.clone(), true));
@@ -87,45 +84,8 @@ fn make_env(binds: &Rc<Vec<MalVal>>, outer_env: &Rc<MalEnv>) -> Result<Rc<MalEnv
     Ok(new_env)
 }
 
-fn make_fun_env(env: &Rc<MalEnv>, binds: &Rc<Vec<MalVal>>, args: &[MalVal]) -> Result<MalEnv, String> {
-    let mut params = HashMap::new();
-
-    for idx in 0 .. binds.len() {
-        match &binds[idx] {
-            Sym(s) => {
-                if s == "&" {
-                    if let Sym(rest_bind) = &binds[idx + 1] {
-                        let rest_args = &args[idx .. args.len()];
-                        params.insert(rest_bind.clone(), mlist!(rest_args.to_vec()));
-                        break;
-                    }
-                    else {
-                        return err!("Got a non-sym after & in binds")
-                    }
-                }
-                else {
-                    if idx < args.len() {
-                        params.insert(s.clone(), args[idx].clone());
-                    }
-                    else {
-                        return Err(format!("have {} binds but got {} args", binds.len(), args.len()));
-                    }
-                }
-            }
-            _ => return err!("Got a non-sym in fn*")
-        }
-    }
-
-    Ok(MalEnv { outer: Some(Rc::clone(env)), data: Rc::new(RefCell::new(params)), id: env.id * 2 })
-}
-
-fn call_user_fun(fun: &MalUserFn, args: &[MalVal]) -> MalRet {
-    let inner_env = make_fun_env(&fun.env, &fun.binds, args)?;
-    Ok(EVAL(&fun.body, &Rc::new(inner_env))?)
-}
-
 #[allow(non_snake_case)]
-fn EVAL(cur_ast: &MalVal, cur_env: &Rc<MalEnv>) -> MalRet {
+pub fn EVAL(cur_ast: &MalVal, cur_env: &Rc<MalEnv>) -> MalRet {
 //    println!("    EVAL: {}", pr_str(cur_ast.clone(), true));
 
     let ast = Cell::new(cur_ast);
@@ -196,7 +156,9 @@ fn EVAL(cur_ast: &MalVal, cur_env: &Rc<MalEnv>) -> MalRet {
                                                 MalUserFn {
                                                     binds: bl.clone(),
                                                     body:  Rc::new(body.clone()),
-                                                    env:   Rc::clone(&env.borrow())
+                                                    env:   Rc::clone(&env.borrow()),
+                                                    // Allow calling user functions in core.
+                                                    eval:  EVAL
                                                 }
                                             )
                                         )

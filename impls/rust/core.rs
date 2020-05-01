@@ -3,17 +3,24 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
+use env::MalEnv;
 use reader::read_str;
 use printer::pr_str;
 use printer::rs_pr_str;
 use types::MalVal::{self, *};
 use types::MalFnSig;
+use types::MalUserFn;
 
 pub type MalRet = Result<MalVal, String>;
 
 #[macro_export]
 macro_rules! err {
     ($e:expr) => { Err($e.to_string()) }
+}
+
+#[macro_export]
+macro_rules! mlist {
+    ($e:expr) => { List(Rc::new($e)) }
 }
 
 fn _pr_str(args: &[MalVal]) -> String {
@@ -66,9 +73,14 @@ fn compare_maps(this: &Rc<HashMap<String, MalVal>>, that: &Rc<HashMap<String, Ma
 }
 
 fn int_op(args: &[MalVal], fun: fn(i64, i64) -> i64) -> MalRet {
-    match (&args[0], &args[1]) {
-        (Int(a), Int(b)) => Ok(Int(fun(*a, *b))),
-        _ => err!("Can only operate on two ints")
+    if args.len() == 2 {
+        match (&args[0], &args[1]) {
+            (Int(a), Int(b)) => Ok(Int(fun(*a, *b))),
+            _ => err!("Can only operate on two ints")
+        }
+    }
+    else {
+        Err(format!("Expected 2 args, got {}", args.len()))
     }
 }
 
@@ -85,6 +97,43 @@ fn read_file(path: &String) -> MalRet {
         Ok(data) => Ok(Str(String::from_utf8_lossy(&data).to_string())),
         Err(e) => Err(e.to_string())
     }
+}
+
+pub fn make_fun_env(env: &Rc<MalEnv>, binds: &Rc<Vec<MalVal>>, args: &[MalVal]) -> Result<MalEnv, String> {
+    let mut params = HashMap::new();
+
+    for idx in 0 .. binds.len() {
+        match &binds[idx] {
+            Sym(s) => {
+                if s == "&" {
+                    if let Sym(rest_bind) = &binds[idx + 1] {
+                        let rest_args = &args[idx .. args.len()];
+                        params.insert(rest_bind.clone(), mlist!(rest_args.to_vec()));
+                        break;
+                    }
+                    else {
+                        return err!("Got a non-sym after & in binds")
+                    }
+                }
+                else {
+                    if idx < args.len() {
+                        params.insert(s.clone(), args[idx].clone());
+                    }
+                    else {
+                        return Err(format!("have {} binds but got {} args", binds.len(), args.len()));
+                    }
+                }
+            }
+            _ => return err!("Got a non-sym in fn*")
+        }
+    }
+
+    Ok(MalEnv { outer: Some(Rc::clone(env)), data: Rc::new(RefCell::new(params)), id: env.id * 2 })
+}
+
+pub fn call_user_fun(fun: &MalUserFn, args: &[MalVal]) -> MalRet {
+    let inner_env = make_fun_env(&fun.env, &fun.binds, args)?;
+    Ok((fun.eval)(&fun.body, &Rc::new(inner_env))?)
 }
 
 fn add_to_core(ns: &mut HashMap<String, MalVal>, name: &str, fun: MalFnSig) {
@@ -180,16 +229,41 @@ pub fn core_ns() -> HashMap<String, MalVal> {
     });
     add("reset!", |args| {
         match &args[0] {
-            Atom(a) => { Ok(a.replace(args[1].clone())) }
+            Atom(a) => {
+                a.replace(args[1].clone());
+                Ok(args[1].clone())
+            }
             _ => err!("Can't reset! a non-atom")
         }
     });
     add("swap!", |args| {
-        Ok(Nil)
-        // match (&args[0], &args[1]) {
-        //     Atom(a) => { Ok(todo!()) }
-        //     _ => err!("Can't swap! a non-atom")
-        // }
+        if args.len() < 2 {
+            err!("Not enough args for swap!, need at least 2")
+        }
+        else {
+            // ([atom, fn], [&args]) = ...
+            let(atfun, params) = args.split_at(2);
+            match (&atfun[0], &atfun[1]) {
+                (Atom(a), UserFun(f)) => {
+                    let mut fnargs = vec![a.borrow().clone()];
+                    fnargs.extend_from_slice(params);
+
+                    let new_val = call_user_fun(f, fnargs.as_slice())?;
+                    a.replace(new_val.clone());
+                    Ok(new_val)
+                }
+                (Atom(a), CoreFun(f)) => {
+                    let mut fnargs = vec![a.borrow().clone()];
+                    fnargs.extend_from_slice(params);
+
+                    let new_val = f(fnargs.as_slice())?;
+                    a.replace(new_val.clone());
+                    Ok(new_val)
+                }
+
+                _ => err!("Can't swap! a non-atom")
+            }
+        }
     });
 
     return ns
