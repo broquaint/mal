@@ -12,6 +12,8 @@ pub struct MalUserFn {
     pub binds: Rc<Vec<MalVal>>,
     pub body:  Rc<MalVal>,
     pub env:   Rc<MalEnv>,
+    // Probably gross way of exposing EVAL into core.
+    pub eval:  fn(&MalVal, &Rc<MalEnv>) -> MalRet
 }
 
 #[derive(Clone)]
