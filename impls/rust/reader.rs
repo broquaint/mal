@@ -98,6 +98,10 @@ fn read_atom(r: &mut Reader) -> Result<MalVal, String> {
     else if tok == "true" || tok == "false" {
         Ok(Bool(tok == "true"))
     }
+    else if tok.starts_with("@") {
+        let atom = r.next()?.clone();
+        Ok(List(Rc::new(vec![Sym("deref".to_string()), Sym(atom)])))
+    }
     else {   
         Ok(
             if is_number(tok) {
