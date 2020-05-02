@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use regex::Regex;
 use regex::Captures;
 
+use ::mal_list;
 use types::MalVal::{self, Int, Sym, Bool, Str, List, Vector, Nil, Map};
 
 #[derive(Debug)]
@@ -70,6 +71,10 @@ fn make_string(tok: &str) -> String {
     }).to_string()
 }
 
+pub fn mal_sym(s: &str) -> MalVal {
+    Sym(s.to_string())
+}
+
 // https://graphemica.com/%CA%9E
 pub static KW_PREFIX: &str = "\u{029E}"; // : => ʞ
 
@@ -100,7 +105,7 @@ fn read_atom(r: &mut Reader) -> Result<MalVal, String> {
     }
     else if tok.starts_with("@") {
         let atom = r.next()?.clone();
-        Ok(List(Rc::new(vec![Sym("deref".to_string()), Sym(atom)])))
+        Ok(mal_list![mal_sym("deref"), Sym(atom)])
     }
     else {   
         Ok(
