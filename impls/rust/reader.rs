@@ -103,9 +103,21 @@ fn read_atom(r: &mut Reader) -> Result<MalVal, String> {
     else if tok == "true" || tok == "false" {
         Ok(Bool(tok == "true"))
     }
-    else if tok.starts_with("@") {
+    else if tok == "@" {
         let atom = r.next()?.clone();
         Ok(mal_list![mal_sym("deref"), Sym(atom)])
+    }
+    else if tok == "'" {
+        Ok(mal_list![mal_sym("quote"), read_form(r)?])
+    }
+    else if tok == "`" {
+        Ok(mal_list![mal_sym("quasiquote"), read_form(r)?])
+    }
+    else if tok == "~" {
+        Ok(mal_list![mal_sym("unquote"), read_form(r)?])
+    }
+    else if tok == "~@" {
+        Ok(mal_list![mal_sym("splice-unquote"), read_form(r)?])
     }
     else {   
         Ok(
