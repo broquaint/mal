@@ -85,6 +85,35 @@ fn make_env(binds: &Rc<Vec<MalVal>>, outer_env: &Rc<MalEnv>) -> Result<Rc<MalEnv
     Ok(new_env)
 }
 
+fn mal_sym(s: &str) -> MalVal {
+    Sym(s.to_string())
+}
+
+fn quasiquote(ast: MalVal) -> MalVal {
+    match ast {
+        List(l) | Vector(l) if !l.is_empty() => {
+            let(head, tail) = l.split_first().unwrap();
+            match head {
+                Sym(s) if s == "unquote" => return tail[0].clone(),
+                List(l) | Vector(l) => {
+                    // A chained if-let would make this a bit cleaner.
+                    if let Sym(s) = &l[0] {
+                        if s == "splice-unquote" {
+                            let(_, ht) = l.split_first().unwrap();
+                            return mlist![vec![
+                                mal_sym("concat"), ht[0].clone(), quasiquote(mlist![tail.to_vec()])
+                            ]]
+                        }
+                    }
+                }
+                _ => { /* This would all be nicer with chained if-let */ }
+            }
+            mlist![vec![mal_sym("cons"), quasiquote(head.clone()), quasiquote(mlist![tail.to_vec()])]]
+        }
+        _ => mlist![vec![mal_sym("quote"), ast]]
+    }
+}
+
 #[allow(non_snake_case)]
 pub fn EVAL(cur_ast: &MalVal, cur_env: &Rc<MalEnv>) -> MalRet {
 //    println!("    EVAL: {}", pr_str(cur_ast.clone(), true));
@@ -172,6 +201,13 @@ pub fn EVAL(cur_ast: &MalVal, cur_env: &Rc<MalEnv>) -> MalRet {
                                 let tmp_ast = EVAL(&rest[0], &env.borrow())?;
                                 // Evaluate the produced AST.
                                 return EVAL(&tmp_ast, &env.borrow().root());
+                            }
+                            "quote" => {
+                                return Ok(rest[0].clone());
+                            }
+                            "quasiquote" => {
+                                let quoted = quasiquote(rest[0].clone());
+                                return EVAL(&quoted, &env.borrow());
                             }
                             _ => { /* fallthrough to function call */ }
                         }
