@@ -19,8 +19,13 @@ macro_rules! err {
 }
 
 #[macro_export]
-macro_rules! mlist {
+macro_rules! as_mal_list {
     ($e:expr) => { List(Rc::new($e)) }
+}
+
+#[macro_export]
+macro_rules! mal_list {
+    ($($e:expr),*) => { List(Rc::new(vec![$($e),*])) }
 }
 
 fn _pr_str(args: &[MalVal]) -> String {
@@ -108,7 +113,7 @@ pub fn make_fun_env(env: &Rc<MalEnv>, binds: &Rc<Vec<MalVal>>, args: &[MalVal]) 
                 if s == "&" {
                     if let Sym(rest_bind) = &binds[idx + 1] {
                         let rest_args = &args[idx .. args.len()];
-                        params.insert(rest_bind.clone(), mlist!(rest_args.to_vec()));
+                        params.insert(rest_bind.clone(), as_mal_list!(rest_args.to_vec()));
                         break;
                     }
                     else {
@@ -271,7 +276,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
         match &args[1] {
             List(l) | Vector(l) => {
                 newlist.extend_from_slice(l.as_slice());
-                Ok(mlist![newlist])
+                Ok(as_mal_list![newlist])
             }
             _ => err!("second arg of cons must be list/vec")
         }
@@ -285,7 +290,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
                 _ => return err!("can only concat list/vec")
             }
         }
-        Ok(mlist![newlist])
+        Ok(as_mal_list![newlist])
     });
 
     return ns

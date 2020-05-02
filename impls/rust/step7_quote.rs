@@ -12,6 +12,7 @@ use types::MalVal::{self, *};
 use types::MalUserFn;
 mod reader;
 use reader::read_str;
+use reader::mal_sym;
 mod printer;
 use printer::pr_str;
 mod env;
@@ -30,7 +31,7 @@ fn eval_ast(ast: &MalVal, menv: &Rc<MalEnv>) -> MalRet {
             for v in l.iter() {
                 new_list.push(EVAL(&v, menv)?);
             }
-            Ok(mlist!(new_list))
+            Ok(as_mal_list!(new_list))
         },
         Vector(l) => {
             let mut new_vec: Vec<MalVal> = Vec::new();
@@ -85,10 +86,6 @@ fn make_env(binds: &Rc<Vec<MalVal>>, outer_env: &Rc<MalEnv>) -> Result<Rc<MalEnv
     Ok(new_env)
 }
 
-fn mal_sym(s: &str) -> MalVal {
-    Sym(s.to_string())
-}
-
 fn quasiquote(ast: MalVal) -> MalVal {
     match ast {
         List(l) | Vector(l) if !l.is_empty() => {
@@ -100,17 +97,17 @@ fn quasiquote(ast: MalVal) -> MalVal {
                     if let Sym(s) = &l[0] {
                         if s == "splice-unquote" {
                             let(_, ht) = l.split_first().unwrap();
-                            return mlist![vec![
-                                mal_sym("concat"), ht[0].clone(), quasiquote(mlist![tail.to_vec()])
-                            ]]
+                            return mal_list![
+                                mal_sym("concat"), ht[0].clone(), quasiquote(as_mal_list![tail.to_vec()])
+                            ]
                         }
                     }
                 }
                 _ => { /* This would all be nicer with chained if-let */ }
             }
-            mlist![vec![mal_sym("cons"), quasiquote(head.clone()), quasiquote(mlist![tail.to_vec()])]]
+            mal_list![mal_sym("cons"), quasiquote(head.clone()), quasiquote(as_mal_list![tail.to_vec()])]
         }
-        _ => mlist![vec![mal_sym("quote"), ast]]
+        _ => mal_list![mal_sym("quote"), ast]
     }
 }
 
@@ -158,7 +155,7 @@ pub fn EVAL(cur_ast: &MalVal, cur_env: &Rc<MalEnv>) -> MalRet {
                             }
                             "do" => {
                                 let(last, leading) = rest.split_last().unwrap();
-                                eval_ast(&mlist!(leading.to_vec()), &env.borrow())?;
+                                eval_ast(&as_mal_list![leading.to_vec()], &env.borrow())?;
                                 ast.replace(&last);
                                 continue 'eval_loop
                             }
@@ -271,12 +268,12 @@ fn main() {
     if argv.len() > 1 {
         let file = argv.next().unwrap();
         repl_env.set(
-            argstar, mlist![argv.map(|arg| Str(arg)).collect()]
+            argstar, as_mal_list![argv.map(|arg| Str(arg)).collect()]
         );
         rep_lit(format!("(load-file {})", file).as_str(), &repl_env)
     }
     else {
-        repl_env.set(argstar, mlist![vec![]]);
+        repl_env.set(argstar, mal_list![]);
         loop {
             print!("user> ");
             io::stdout().flush().unwrap();
