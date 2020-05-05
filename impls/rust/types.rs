@@ -9,11 +9,12 @@ pub type MalFnSig = fn(&[MalVal]) -> MalRet;
 
 #[derive(Clone)]
 pub struct MalUserFn {
-    pub binds: Rc<Vec<MalVal>>,
-    pub body:  Rc<MalVal>,
-    pub env:   Rc<MalEnv>,
+    pub binds:    Rc<Vec<MalVal>>,
+    pub body:     Rc<MalVal>,
+    pub env:      Rc<MalEnv>,
+    pub is_macro: bool,
     // Probably gross way of exposing EVAL into core.
-    pub eval:  fn(&MalVal, &Rc<MalEnv>) -> MalRet
+    pub eval:  fn(Rc<MalVal>, &Rc<MalEnv>) -> MalRet,
 }
 
 #[derive(Clone)]

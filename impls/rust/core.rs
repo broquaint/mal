@@ -138,7 +138,7 @@ pub fn make_fun_env(env: &Rc<MalEnv>, binds: &Rc<Vec<MalVal>>, args: &[MalVal]) 
 
 pub fn call_user_fun(fun: &MalUserFn, args: &[MalVal]) -> MalRet {
     let inner_env = make_fun_env(&fun.env, &fun.binds, args)?;
-    Ok((fun.eval)(&fun.body, &Rc::new(inner_env))?)
+    Ok((fun.eval)(Rc::clone(&fun.body), &Rc::new(inner_env))?)
 }
 
 fn add_to_core(ns: &mut HashMap<String, MalVal>, name: &str, fun: MalFnSig) {
