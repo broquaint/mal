@@ -293,5 +293,48 @@ pub fn core_ns() -> HashMap<String, MalVal> {
         Ok(as_mal_list![newlist])
     });
 
+    // TODO Handle args being empty, otherwise we panic on args[0]
+    add("nth", |args| {
+        match &args[0] {
+            List(l) | Vector(l) => {
+                let n = if let Int(v) = &args[1] { v }
+                        else { return err!("second arg to nth must be a number") };
+                let idx = *n as usize;
+                if idx < l.len() {
+                    Ok(l[idx].clone())
+                }
+                else {
+                    Err(format!("the index {} is out of bounds for {}", idx, pr_str(args[0].clone(), true)))
+                }
+            }
+            _ => err!("can only call nth on list/vec")
+        }
+    });
+
+    add("first", |args| {
+        match &args[0] {
+            List(l) | Vector(l) => {
+                if l.is_empty() { Ok(Nil) } else { Ok(l[0].clone()) }
+            }
+            Nil => Ok(Nil),
+            _ => Err(format!("Can't call first on {}", pr_str(args[0].clone(), true)))
+        }
+    });
+
+    add("rest", |args| {
+        match &args[0] {
+            List(l) | Vector(l) => {
+                if l.is_empty() {
+                    Ok(mal_list![])
+                }
+                else {
+                    Ok(as_mal_list![l[1 ..].to_vec()])
+                }
+            }
+            Nil => Ok(mal_list![]),
+            _ => Err(format!("Can't call rest on {}", pr_str(args[0].clone(), true)))
+        }
+    });
+
     return ns
 }
