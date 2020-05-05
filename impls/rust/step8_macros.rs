@@ -21,6 +21,11 @@ use core::core_ns; // Also exports err!, mlist! macros.
 use core::call_user_fun;
 use core::MalRet;
 
+// Simplify common EVAL use case where the first arg is cloned into a new Rc.
+macro_rules! ervl {
+    ($val:expr, $env:expr) => { EVAL(Rc::new($val.clone()), $env) }
+}
+
 fn eval_ast(ast: Rc<MalVal>, menv: &Rc<MalEnv>) -> MalRet {
 //    println!("eval_ast: {}", pr_str(ast.clone(), true));
     match &*ast {
@@ -28,7 +33,7 @@ fn eval_ast(ast: Rc<MalVal>, menv: &Rc<MalEnv>) -> MalRet {
             let mut new_list: Vec<MalVal> = Vec::new();
             // Iterate with for-loop to raise the first Err encountered.
             for v in l.iter() {
-                new_list.push(EVAL(Rc::new(v.clone()), menv)?);
+                new_list.push(ervl!(v, menv)?);
             }
             Ok(as_mal_list!(new_list))
         },
@@ -36,7 +41,7 @@ fn eval_ast(ast: Rc<MalVal>, menv: &Rc<MalEnv>) -> MalRet {
             let mut new_vec: Vec<MalVal> = Vec::new();
             // Iterate with for-loop to raise the first Err encountered.
             for v in l.iter() {
-                new_vec.push(EVAL(Rc::new(v.clone()), menv)?);
+                new_vec.push(ervl!(v, menv)?);
             }
             Ok(Vector(Rc::new(new_vec)))
         },
@@ -44,7 +49,7 @@ fn eval_ast(ast: Rc<MalVal>, menv: &Rc<MalEnv>) -> MalRet {
             let mut new_map: HashMap<String, MalVal> = HashMap::new();
             // Iterate with for-loop to raise the first Err encountered.
             for (k, v) in l.iter() {
-                new_map.insert(k.clone(), EVAL(Rc::new(v.clone()), menv)?);
+                new_map.insert(k.clone(), ervl!(v, menv)?);
             }
             Ok(Map(Rc::new(new_map)))
         },
@@ -75,7 +80,7 @@ fn make_env(binds: &Rc<Vec<MalVal>>, outer_env: &Rc<MalEnv>) -> Result<Rc<MalEnv
     for bind in binds.chunks(2) {
         match &bind[0] {
             Sym(k) => {
-                let v = EVAL(Rc::new(bind[1].clone()), &new_env)?;
+                let v = ervl!(bind[1], &new_env)?;
                 new_env.set(k.clone(), v);
             }
             _ => return err!("bind in let* wasn't a symbol")
@@ -168,7 +173,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                 let (name, args) = rest.split_first().unwrap();
                                 return match name {
                                     Sym(s) => {
-                                        let val = EVAL(Rc::new(args[0].clone()), &env.borrow())?;
+                                        let val = ervl!(args[0], &env.borrow())?;
                                         env.borrow().set(s.clone(), val.clone());
                                         Ok(val)
                                     },
@@ -179,7 +184,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                 let (name, args) = rest.split_first().unwrap();
                                 return match name {
                                     Sym(s) => {
-                                        let val = EVAL(Rc::new(args[0].clone()), &env.borrow())?;
+                                        let val = ervl!(args[0], &env.borrow())?;
                                         if let UserFun(f) = val {
                                             let mut mac = f.clone();
                                             mac.is_macro = true;
@@ -214,7 +219,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                             }
                             "if" => {
                                 // rest[0] = cond, rest[1] = true branch, rest[2] = false branch
-                                let next_ast = if is_true(EVAL(Rc::new(rest[0].clone()), &env.borrow())?) {
+                                let next_ast = if is_true(ervl!(rest[0], &env.borrow())?) {
                                     &rest[1]
                                 }
                                 else if rest.len() > 2 {
@@ -250,7 +255,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                             }
                             "eval" => {
                                 // Get the ast to run EVAL against.
-                                let tmp_ast = EVAL(Rc::new(rest[0].clone()), &env.borrow())?;
+                                let tmp_ast = ervl!(rest[0], &env.borrow())?;
                                 // Evaluate the produced AST.
                                 return EVAL(Rc::new(tmp_ast), &env.borrow().root());
                             }
