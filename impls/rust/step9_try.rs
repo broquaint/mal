@@ -9,6 +9,8 @@ extern crate regex;
 mod types;
 use types::MalVal::{self, *};
 use types::MalUserFn;
+use types::MalRet;
+use types::MalErr;
 mod reader;
 use reader::read_str;
 use reader::mal_sym;
@@ -20,7 +22,6 @@ mod core;
 use core::core_ns; // Also exports err!, mlist! macros.
 use core::make_bound_env;
 use core::call_user_fun;
-use core::MalRet;
 
 // Simplify common EVAL use case where the first arg is cloned into a new Rc.
 macro_rules! ervl {
@@ -66,7 +67,7 @@ fn is_true(cond: MalVal) -> bool {
     }
 }
 
-fn make_env(binds: &Rc<Vec<MalVal>>, outer_env: &Rc<MalEnv>) -> Result<Rc<MalEnv>, String> {
+fn make_env(binds: &Rc<Vec<MalVal>>, outer_env: &Rc<MalEnv>) -> Result<Rc<MalEnv>, MalErr> {
     let new_env = Rc::new(MalEnv {
         outer: Some(Rc::clone(outer_env)),
         data:  Rc::new(RefCell::new(HashMap::new())),
@@ -133,7 +134,7 @@ fn is_macro_call(ast: Rc<MalVal>, env: &Rc<MalEnv>) -> Option<MalUserFn> {
     }
 }
 
-fn macroexpand(mut ast: Rc<MalVal>, env: &Rc<MalEnv>) -> Result<Rc<MalVal>, String> {
+fn macroexpand(mut ast: Rc<MalVal>, env: &Rc<MalEnv>) -> Result<Rc<MalVal>, MalErr> {
     while let Some(f) = is_macro_call(Rc::clone(&ast), env) {
         if let List(l) = &*ast {
             let (_, args) = l.split_first().unwrap();
@@ -199,7 +200,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                             "macroexpand" => {
                                 let astrc  = macroexpand(Rc::new(rest[0].clone()), &env.borrow())?;
                                 let newast = Rc::try_unwrap(astrc); // Result<MalVal, Rc<MalVal>>
-                                return newast.map_err(|_| "couldn't get at result of macroexpand?!".to_string());
+                                return newast.map_err(|_| MalErr(Rc::new(Str("couldn't get at result of macroexpand?!".to_string()))));
                             }
                             "let*" => {
                                 let binds = &rest[0];
@@ -283,10 +284,10 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                                 (Sym(s), Sym(_)) if s == "catch*" => {
                                                     // Only expect a single bind to the single error.
                                                     let bindlist  = Rc::new(vec![bind.clone()]);
-                                                    let catch_env = make_bound_env(&env.borrow(), &bindlist, &[Str(err)])?;
+                                                    let catch_env = make_bound_env(&env.borrow(), &bindlist, &[err.to_val()])?;
                                                     EVAL(Rc::new(body.clone()), &Rc::new(catch_env))
                                                 }
-                                                (err, _) => Err(format!("Expected catch*, got {}", pr_str(err.clone(), true)))
+                                                (_, err) => errf!("Expected catch*, got {}", pr_str(err.clone(), true))
                                             }
                                         }
                                         else {
@@ -304,7 +305,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                         match fun {
                             CoreFun(f) => f(args),
                             UserFun(f) => call_user_fun(f, args),
-                            f => Err(format!("Can't call '{}' as a function", pr_str(f.clone(), true)))
+                            f => errf!("Can't call '{}' as a function", pr_str(f.clone(), true))
                         }
                     }
                     else {
@@ -323,13 +324,16 @@ fn PRINT(code: MalVal) -> String {
 }
 
 #[allow(non_snake_case)]
-fn READ(code: String) -> MalRet {
+fn READ(code: String) -> Result<MalVal, String> {
     read_str(code)
 }
 
 fn rep(code: String, menv: &Rc<MalEnv>) -> Result<String, String> {
     let ast = READ(code)?;
-    EVAL(Rc::new(ast), menv).map(|res| PRINT(res))
+    match EVAL(Rc::new(ast), menv) {
+        Ok(res) => Ok(PRINT(res)),
+        Err(err) => Err(pr_str(err.to_val(), true)),
+    }
 }
 
 fn rep_lit(code: &str, env: &Rc<MalEnv>) {
@@ -369,7 +373,7 @@ fn main() {
             match io::stdin().read_line(&mut input) {
                 Ok(_)  => {
                     let result = rep(input, &repl_env);
-                    println!("{}", match result { Ok(s) => s, Err(e) => e });
+                    println!("{}", result.map_or_else(|s| s, |e| e));
                 }
                 Err(_) => { break; }
             }

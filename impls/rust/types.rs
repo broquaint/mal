@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use env::MalEnv;
 
-type MalRet = Result<MalVal, String>;
+pub type MalRet   = Result<MalVal, MalErr>;
 pub type MalFnSig = fn(&[MalVal]) -> MalRet;
 
 #[derive(Clone)]
@@ -15,6 +15,16 @@ pub struct MalUserFn {
     pub is_macro: bool,
     // Probably gross way of exposing EVAL into core.
     pub eval:  fn(Rc<MalVal>, &Rc<MalEnv>) -> MalRet,
+}
+
+#[derive(Clone)]
+pub struct MalErr(pub Rc<MalVal>);
+
+impl MalErr {
+    pub fn to_val(self) -> MalVal {
+        let MalErr(r) = self;
+        (*r).clone()
+    }
 }
 
 #[derive(Clone)]

@@ -10,12 +10,24 @@ use printer::rs_pr_str;
 use types::MalVal::{self, *};
 use types::MalFnSig;
 use types::MalUserFn;
+use types::MalErr;
+use types::MalRet;
 
-pub type MalRet = Result<MalVal, String>;
+#[macro_export]
+macro_rules! as_mal_err {
+    ($e:expr) => { Err(MalErr(Rc::new($e))) }
+}
+
+#[macro_export]
+macro_rules! errf {
+    ($fmt:expr, $($e:expr),*) => {
+        as_mal_err!(Str(format!($fmt, $($e),*)))
+    }
+}
 
 #[macro_export]
 macro_rules! err {
-    ($e:expr) => { Err($e.to_string()) }
+    ($e:expr) => { as_mal_err!(Str($e.to_string())) }
 }
 
 #[macro_export]
@@ -85,7 +97,7 @@ fn int_op(args: &[MalVal], fun: fn(i64, i64) -> i64) -> MalRet {
         }
     }
     else {
-        Err(format!("Expected 2 args, got {}", args.len()))
+        errf!("Expected 2 args, got {}", args.len())
     }
 }
 
@@ -100,11 +112,11 @@ fn read_file(path: &String) -> MalRet {
     let res = fs::read(path.as_str());
     match res {
         Ok(data) => Ok(Str(String::from_utf8_lossy(&data).to_string())),
-        Err(e) => Err(e.to_string())
+        Err(e) => err!(e)
     }
 }
 
-pub fn make_bound_env(env: &Rc<MalEnv>, binds: &Rc<Vec<MalVal>>, args: &[MalVal]) -> Result<MalEnv, String> {
+pub fn make_bound_env(env: &Rc<MalEnv>, binds: &Rc<Vec<MalVal>>, args: &[MalVal]) -> Result<MalEnv, MalErr> {
     let mut params = HashMap::new();
 
     for idx in 0 .. binds.len() {
@@ -125,7 +137,7 @@ pub fn make_bound_env(env: &Rc<MalEnv>, binds: &Rc<Vec<MalVal>>, args: &[MalVal]
                         params.insert(s.clone(), args[idx].clone());
                     }
                     else {
-                        return Err(format!("have {} binds but got {} args", binds.len(), args.len()));
+                        return errf!("have {} binds but got {} args", binds.len(), args.len());
                     }
                 }
             }
@@ -208,7 +220,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
 
     add("read-string", |args| {
         match &args[0] {
-            Str(s) => read_str(s.clone()),
+            Str(s) => read_str(s.clone()).map_err(|e| MalErr(Rc::new(Str(e)))),
             _ => err!("Can't read-str a non-string")
         }
     });
@@ -304,7 +316,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
                     Ok(l[idx].clone())
                 }
                 else {
-                    Err(format!("the index {} is out of bounds for {}", idx, pr_str(args[0].clone(), true)))
+                    errf!("the index {} is out of bounds for {}", idx, pr_str(args[0].clone(), true))
                 }
             }
             _ => err!("can only call nth on list/vec")
@@ -317,7 +329,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
                 if l.is_empty() { Ok(Nil) } else { Ok(l[0].clone()) }
             }
             Nil => Ok(Nil),
-            _ => Err(format!("Can't call first on {}", pr_str(args[0].clone(), true)))
+            _ => errf!("Can't call first on {}", pr_str(args[0].clone(), true))
         }
     });
 
@@ -332,8 +344,12 @@ pub fn core_ns() -> HashMap<String, MalVal> {
                 }
             }
             Nil => Ok(mal_list![]),
-            _ => Err(format!("Can't call rest on {}", pr_str(args[0].clone(), true)))
+            _ => errf!("Can't call rest on {}", pr_str(args[0].clone(), true))
         }
+    });
+
+    add("throw", |args| {
+        as_mal_err!(args[0].clone())
     });
 
     return ns
