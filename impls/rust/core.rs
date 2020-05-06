@@ -104,7 +104,7 @@ fn read_file(path: &String) -> MalRet {
     }
 }
 
-pub fn make_fun_env(env: &Rc<MalEnv>, binds: &Rc<Vec<MalVal>>, args: &[MalVal]) -> Result<MalEnv, String> {
+pub fn make_bound_env(env: &Rc<MalEnv>, binds: &Rc<Vec<MalVal>>, args: &[MalVal]) -> Result<MalEnv, String> {
     let mut params = HashMap::new();
 
     for idx in 0 .. binds.len() {
@@ -137,7 +137,7 @@ pub fn make_fun_env(env: &Rc<MalEnv>, binds: &Rc<Vec<MalVal>>, args: &[MalVal]) 
 }
 
 pub fn call_user_fun(fun: &MalUserFn, args: &[MalVal]) -> MalRet {
-    let inner_env = make_fun_env(&fun.env, &fun.binds, args)?;
+    let inner_env = make_bound_env(&fun.env, &fun.binds, args)?;
     Ok((fun.eval)(Rc::clone(&fun.body), &Rc::new(inner_env))?)
 }
 

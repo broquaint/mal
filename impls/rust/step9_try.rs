@@ -18,6 +18,7 @@ mod env;
 use env::MalEnv;
 mod core;
 use core::core_ns; // Also exports err!, mlist! macros.
+use core::make_bound_env;
 use core::call_user_fun;
 use core::MalRet;
 
@@ -27,7 +28,6 @@ macro_rules! ervl {
 }
 
 fn eval_ast(ast: Rc<MalVal>, menv: &Rc<MalEnv>) -> MalRet {
-//    println!("eval_ast: {}", pr_str(ast.clone(), true));
     match &*ast {
         List(l) => {
             let mut new_list: Vec<MalVal> = Vec::new();
@@ -152,8 +152,6 @@ fn macroexpand(mut ast: Rc<MalVal>, env: &Rc<MalEnv>) -> Result<Rc<MalVal>, Stri
 
 #[allow(non_snake_case)]
 pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
-//    println!("    EVAL: {}", pr_str(cur_ast.clone(), true));
-
     let env = RefCell::new(Rc::clone(cur_env));
 
     'eval_loop: loop {
@@ -271,6 +269,32 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                 ast = Rc::new(quasiquote(rest[0].clone()));
                                 continue 'eval_loop
                             }
+                            "try*" => {
+                                return match ervl!(rest[0], &env.borrow()) {
+                                    Ok(res) => Ok(res),
+                                    Err(err) => {
+                                        if rest.len() == 1 {
+                                            // Throw it up if nothing can catch it
+                                            Err(err)
+                                        }
+                                        else if let List(exvec) = &rest[1] {
+                                            let(sym, bind, body) = (&exvec[0], &exvec[1], &exvec[2]);
+                                            match (sym, bind) {
+                                                (Sym(s), Sym(_)) if s == "catch*" => {
+                                                    // Only expect a single bind to the single error.
+                                                    let bindlist  = Rc::new(vec![bind.clone()]);
+                                                    let catch_env = make_bound_env(&env.borrow(), &bindlist, &[Str(err)])?;
+                                                    EVAL(Rc::new(body.clone()), &Rc::new(catch_env))
+                                                }
+                                                (err, _) => Err(format!("Expected catch*, got {}", pr_str(err.clone(), true)))
+                                            }
+                                        }
+                                        else {
+                                            err!("try/catch had a weird structure")
+                                        }
+                                    }
+                                }
+                            }
                             _ => { /* fallthrough to function call */ }
                         }
                     }
@@ -280,7 +304,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                         match fun {
                             CoreFun(f) => f(args),
                             UserFun(f) => call_user_fun(f, args),
-                            _ => err!("Tried to call function on non-Fun")
+                            f => Err(format!("Can't call '{}' as a function", pr_str(f.clone(), true)))
                         }
                     }
                     else {
