@@ -2,7 +2,11 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Deref;
+
+use types::MalVal::Str;
 use types::MalVal;
+use types::MalErr;
+use types::MalRet;
 
 #[derive(Clone)]
 pub struct MalEnv {
@@ -38,12 +42,13 @@ impl MalEnv {
         }
     }
 
-    pub fn get(&self, k: &String) -> Result<MalVal, String> {
+    pub fn get(&self, k: &String) -> MalRet {
         if let Some(menv) = self.find(k) {
             Ok(menv.data.borrow().get(k).unwrap().clone())
         }
         else {
-            Err(format!("'{}' not found", k))
+            // errf! would be nicer but failing at macro use/export.
+            Err(MalErr(Rc::new(Str(format!("'{}' not found", k)))))
         }
     }
 }
