@@ -124,7 +124,7 @@ fn is_macro_call(ast: Rc<MalVal>, env: &Rc<MalEnv>) -> Option<MalUserFn> {
                 let r = e.unwrap().get(&s);
                 match r {
                     // Return a MalUserFn here to saving pulling it out again in macroexpand.
-                    Ok(UserFun(f)) if f.is_macro  => Some(f),
+                    Ok(UserFun(f)) if f.is_macro => Some(f),
                     _ => None
                 }
             } else { None }
@@ -199,11 +199,9 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                 }
                             }
                             "macroexpand" => {
-                                let res = macroexpand(Rc::new(rest[0].clone()), &env.borrow())?;
-                                return match Rc::try_unwrap(res) {
-                                    Ok(v) => Ok(v),
-                                    Err(_) => err!("couldn't get at result of macroexpand?!")
-                                }
+                                let astrc  = macroexpand(Rc::new(rest[0].clone()), &env.borrow())?;
+                                let newast = Rc::try_unwrap(astrc); // Result<MalVal, Rc<MalVal>>
+                                return newast.map_err(|_| "couldn't get at result of macroexpand?!".to_string());
                             }
                             "let*" => {
                                 let binds = &rest[0];
@@ -307,10 +305,7 @@ fn READ(code: String) -> MalRet {
 
 fn rep(code: String, menv: &Rc<MalEnv>) -> Result<String, String> {
     let ast = READ(code)?;
-    match EVAL(Rc::new(ast), menv) {
-        Ok(res) => Ok(PRINT(res)),
-        Err(e) => Err(e)
-    }
+    EVAL(Rc::new(ast), menv).map(|res| PRINT(res))
 }
 
 fn rep_lit(code: &str, env: &Rc<MalEnv>) {
