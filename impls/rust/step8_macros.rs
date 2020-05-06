@@ -198,6 +198,13 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                     _ => err!("First elem of defmacro! wasn't a Sym")
                                 }
                             }
+                            "macroexpand" => {
+                                let res = macroexpand(Rc::new(rest[0].clone()), &env.borrow())?;
+                                return match Rc::try_unwrap(res) {
+                                    Ok(v) => Ok(v),
+                                    Err(_) => err!("couldn't get at result of macroexpand?!")
+                                }
+                            }
                             "let*" => {
                                 let binds = &rest[0];
                                 let form = &rest[1];
@@ -322,6 +329,7 @@ fn main() {
 
     rep_lit("(def! not (fn* (a) (if a false true)))", &repl_env);
     rep_lit("(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\nnil)\")))))", &repl_env);
+    rep_lit("(defmacro! cond (fn* (& xs) (if (> (count xs) 0) (list 'if (first xs) (if (> (count xs) 1) (nth xs 1) (throw \"odd number of forms to cond\")) (cons 'cond (rest (rest xs)))))))", &repl_env);
 
     let argstar  = "*ARGV*".to_string();
     let mut argv = args();
