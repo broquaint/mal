@@ -329,7 +329,7 @@ fn rep(code: String, menv: &Rc<MalEnv>) -> Result<String, String> {
     let ast = READ(code)?;
     match EVAL(Rc::new(ast), menv) {
         Ok(res) => Ok(PRINT(res)),
-        Err(err) => Err(pr_str(err.to_val(), true)),
+        Err(err) => Err(format!("Error encountered: {}", pr_str(err.to_val(), true))),
     }
 }
 
