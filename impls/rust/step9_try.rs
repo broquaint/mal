@@ -22,6 +22,7 @@ mod core;
 use core::core_ns; // Also exports err!, mlist! macros.
 use core::make_bound_env;
 use core::call_user_fun;
+use core::call_fun;
 
 // Simplify common EVAL use case where the first arg is cloned into a new Rc.
 macro_rules! ervl {
@@ -302,11 +303,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
 
                     return if let List(fcall) = eval_ast(ast, &env.borrow())? {
                         let (fun, args) = fcall.split_first().unwrap();
-                        match fun {
-                            CoreFun(f) => f(args),
-                            UserFun(f) => call_user_fun(f, args),
-                            f => errf!("Can't call '{}' as a function", pr_str(f.clone(), true))
-                        }
+                        call_fun(&fun, args)
                     }
                     else {
                         err!("Somehow eval_ast(List) didn't return a list?")
