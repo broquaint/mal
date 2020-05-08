@@ -78,6 +78,10 @@ pub fn mal_sym(s: &str) -> MalVal {
 // https://graphemica.com/%CA%9E
 pub static KW_PREFIX: &str = "\u{029E}"; // : => ʞ
 
+pub fn make_keyword(kw: &str) -> String {
+    format!("{}{}", KW_PREFIX, kw)
+}
+
 fn read_atom(r: &mut Reader) -> Result<MalVal, String> {
     let tok = r.next()?;
     // Handle quote specifically to avoid panic.
@@ -89,7 +93,7 @@ fn read_atom(r: &mut Reader) -> Result<MalVal, String> {
                 }
                 else {
                     // This is a keyword but implemented as Str for type sanity.
-                    format!("{}{}", KW_PREFIX, &tok[1 .. tok.len()])
+                    make_keyword(&tok[1 .. tok.len()])
                 }
             ))
         }

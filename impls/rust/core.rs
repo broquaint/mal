@@ -5,6 +5,8 @@ use std::collections::HashMap;
 
 use env::MalEnv;
 use reader::read_str;
+use reader::make_keyword;
+use reader::KW_PREFIX;
 use printer::pr_str;
 use printer::rs_pr_str;
 use types::MalVal::{self, *};
@@ -38,6 +40,10 @@ macro_rules! as_mal_list {
 #[macro_export]
 macro_rules! mal_list {
     ($($e:expr),*) => { List(Rc::new(vec![$($e),*])) }
+}
+
+macro_rules! v_to_str {
+    ($e:expr) => { pr_str($e.clone(), true) }
 }
 
 fn _pr_str(args: &[MalVal]) -> String {
@@ -157,7 +163,7 @@ pub fn call_fun(maybe_fun: &MalVal, args: &[MalVal]) -> MalRet {
     match maybe_fun {
         CoreFun(f) => f(args),
         UserFun(f) => call_user_fun(f, args),
-        _ => errf!("can't treat this as a function: {}", pr_str(maybe_fun.clone(), true))
+        _ => errf!("can't treat this as a function: {}", v_to_str!(maybe_fun))
     }
 }
 
@@ -315,7 +321,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
                     Ok(l[idx].clone())
                 }
                 else {
-                    errf!("the index {} is out of bounds for {}", idx, pr_str(args[0].clone(), true))
+                    errf!("the index {} is out of bounds for {}", idx, v_to_str!(args[0]))
                 }
             }
             _ => err!("can only call nth on list/vec")
@@ -328,7 +334,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
                 if l.is_empty() { Ok(Nil) } else { Ok(l[0].clone()) }
             }
             Nil => Ok(Nil),
-            _ => errf!("Can't call first on {}", pr_str(args[0].clone(), true))
+            _ => errf!("Can't call first on {}", v_to_str!(args[0]))
         }
     });
 
@@ -343,7 +349,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
                 }
             }
             Nil => Ok(mal_list![]),
-            _ => errf!("Can't call rest on {}", pr_str(args[0].clone(), true))
+            _ => errf!("Can't call rest on {}", v_to_str!(args[0]))
         }
     });
 
@@ -380,6 +386,122 @@ pub fn core_ns() -> HashMap<String, MalVal> {
 
     add("symbol?", |args| {
         Ok(Bool(matches!(&args[0], Sym(_))))
+    });
+
+    add("symbol", |args| {
+        match &args[0] {
+            Str(s) => Ok(Sym(s.clone())),
+            v => errf!("expected a string for (symbol) got: {}", v_to_str!(v))
+        }
+    });
+
+    add("keyword", |args| {
+        match &args[0] {
+            Str(s) => Ok(Str(
+                if s.starts_with(KW_PREFIX) { s.clone() } else { make_keyword(&s[..]) }
+            )),
+            v => errf!("expected a string for (symbol) got: {}", v_to_str!(v))
+        }
+    });
+
+    add("keyword?", |args| {
+        Ok(Bool(matches!(&args[0], Str(s) if s.starts_with(KW_PREFIX))))
+    });
+
+    add("vector", |args| {
+        Ok(Vector(Rc::new(args.to_vec())))
+    });
+
+    add("vector?", |args| {
+        Ok(Bool(matches!(&args[0], Vector(_))))
+    });
+
+    add("sequential?", |args| {
+        Ok(Bool(matches!(&args[0], List(_) | Vector(_))))
+    });
+
+    add("hash-map", |args| {
+        if args.len() % 2 != 0 {
+            err!("hash-map received an odd number of elements")
+        } else {
+            let mut map : HashMap<String, MalVal> = HashMap::new();
+            for pair in args.chunks(2) {
+                match &pair[0] {
+                    Str(s) => { map.insert(s.clone(), pair[1].clone()); }
+                    _      => return errf!("map keys can only be string or keyword, got: {}", v_to_str!(&pair[0]))
+                }
+            }
+            Ok(Map(Rc::new(map)))
+        }
+    });
+
+    add("map?", |args| {
+        Ok(Bool(matches!(&args[0], Map(_))))
+    });
+
+    add("assoc", |args| {
+        let (src_map, rest) = args.split_first().unwrap();
+        if rest.len() % 2 != 0 {
+            errf!("assoc received an odd number of elements, got {} args", rest.len())
+        } else if let Map(m) = src_map {
+            let mut map : HashMap<String, MalVal> = (**m).clone();
+            for pair in rest.chunks(2) {
+                match &pair[0] {
+                    Str(s) => { map.insert(s.clone(), pair[1].clone()); }
+                    _      => return errf!("map keys can only be string or keyword, got: {}", v_to_str!(&pair[0]))
+                }
+            }
+            Ok(Map(Rc::new(map)))
+        } else {
+            errf!("assoc expects map, got: {}", v_to_str!(src_map))
+        }
+    });
+
+    add("dissoc", |args| {
+        let (src_map, rest) = args.split_first().unwrap();
+        if let Map(m) = src_map {
+            let mut map : HashMap<String, MalVal> = (**m).clone();
+            for k in rest {
+                match &k {
+                    Str(s) => { map.remove(s); }
+                    _      => return errf!("map keys can only be string or keyword, got: {}", v_to_str!(k))
+                }
+            }
+            Ok(Map(Rc::new(map)))
+        } else {
+            errf!("dissoc expects map, got: {}", v_to_str!(src_map))
+        }
+    });
+
+    add("get", |args| {
+        match (&args[0], &args[1]) {
+            (Map(m), Str(s)) => Ok(m.get(s).map_or(Nil, |v| v.clone())),
+            (Nil, _) => Ok(Nil),
+            _ => errf!("get expects map & string/keyword, got: {}, {}", v_to_str!(&args[0]), v_to_str!(&args[1]))
+        }
+    });
+
+    add("contains?", |args| {
+        match (&args[0], &args[1]) {
+            (Map(m), Str(s)) => Ok(Bool(m.contains_key(s))),
+            _ => errf!("contains? expects map & string/keyword, got: {}, {}", v_to_str!(&args[0]), v_to_str!(&args[1]))
+        }
+    });
+
+    add("keys", |args| {
+        if let Map(m) = &args[0] {
+            Ok(as_mal_list![m.keys().map(|k| Str(k.clone())).collect()])
+        } else {
+            errf!("keys expects map, got: {}", v_to_str!(&args[0]))
+        }
+    });
+
+    add("vals", |args| {
+        if let Map(m) = &args[0] {
+            Ok(as_mal_list![m.values().map(|v| v.clone()).collect()])
+        } else {
+            errf!("vals expects map, got: {}", v_to_str!(&args[0]))
+        }
     });
 
     return ns
