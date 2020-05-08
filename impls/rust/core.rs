@@ -153,6 +153,14 @@ pub fn call_user_fun(fun: &MalUserFn, args: &[MalVal]) -> MalRet {
     Ok((fun.eval)(Rc::clone(&fun.body), &Rc::new(inner_env))?)
 }
 
+pub fn call_fun(maybe_fun: &MalVal, args: &[MalVal]) -> MalRet {
+    match maybe_fun {
+        CoreFun(f) => f(args),
+        UserFun(f) => call_user_fun(f, args),
+        _ => errf!("can't treat this as a function: {}", pr_str(maybe_fun.clone(), true))
+    }
+}
+
 fn add_to_core(ns: &mut HashMap<String, MalVal>, name: &str, fun: MalFnSig) {
     ns.insert(name.to_string(), CoreFun(fun));
 }
@@ -260,24 +268,15 @@ pub fn core_ns() -> HashMap<String, MalVal> {
         else {
             // ([atom, fn], [&args]) = ...
             let(atfun, params) = args.split_at(2);
-            match (&atfun[0], &atfun[1]) {
-                (Atom(a), UserFun(f)) => {
+            match &atfun[0] {
+                Atom(a) => {
                     let mut fnargs = vec![a.borrow().clone()];
                     fnargs.extend_from_slice(params);
 
-                    let new_val = call_user_fun(f, fnargs.as_slice())?;
+                    let new_val = call_fun(&atfun[1], fnargs.as_slice())?;
                     a.replace(new_val.clone());
                     Ok(new_val)
                 }
-                (Atom(a), CoreFun(f)) => {
-                    let mut fnargs = vec![a.borrow().clone()];
-                    fnargs.extend_from_slice(params);
-
-                    let new_val = f(fnargs.as_slice())?;
-                    a.replace(new_val.clone());
-                    Ok(new_val)
-                }
-
                 _ => err!("Can't swap! a non-atom")
             }
         }
@@ -356,11 +355,15 @@ pub fn core_ns() -> HashMap<String, MalVal> {
         let(fun, rest) = args.split_first().unwrap();
         let(args_b, args_a) = rest.split_last().unwrap();
         let last_arg = args_b.as_vec()?;
-        match &fun {
-            CoreFun(f) => f(&[&args_a[..], &last_arg[..]].concat()),
-            UserFun(f) => call_user_fun(f, &[&args_a[..], &last_arg[..]].concat()),
-            _ => errf!("expected (apply f args? args) got (apply {} args? {})", pr_str(fun.clone(), true), pr_str(args_b.clone(), true))
+        call_fun(&fun, &[&args_a[..], &last_arg[..]].concat())
+    });
+
+    add("map", |args| {
+        let mut res = Vec::new();
+        for v in args[1].as_vec()?.iter() {
+            res.push(call_fun(&args[0], &[v.clone()])?);
         }
+        Ok(as_mal_list![res])
     });
 
     return ns
