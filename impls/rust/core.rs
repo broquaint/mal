@@ -366,5 +366,21 @@ pub fn core_ns() -> HashMap<String, MalVal> {
         Ok(as_mal_list![res])
     });
 
+    add("nil?", |args| {
+        Ok(Bool(matches!(&args[0], Nil)))
+    });
+
+    add("true?", |args| {
+        Ok(Bool(matches!(&args[0], Bool(b) if *b)))
+    });
+
+    add("false?", |args| {
+        Ok(Bool(matches!(&args[0], Bool(b) if !*b)))
+    });
+
+    add("symbol?", |args| {
+        Ok(Bool(matches!(&args[0], Sym(_))))
+    });
+
     return ns
 }
