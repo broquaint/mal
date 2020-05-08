@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use env::MalEnv;
+use printer::pr_str;
 
 pub type MalRet   = Result<MalVal, MalErr>;
 pub type MalFnSig = fn(&[MalVal]) -> MalRet;
@@ -40,4 +41,13 @@ pub enum MalVal {
     UserFun(MalUserFn),
     CoreFun(MalFnSig),
     Atom(Rc<RefCell<MalVal>>),
+}
+
+impl MalVal {
+    pub fn as_vec(&self) -> Result<Rc<Vec<MalVal>>, MalErr> {
+        match self {
+            MalVal::List(l) | MalVal::Vector(l) => Ok(Rc::new((**l).clone())),
+            _ => Err(MalErr(Rc::new(MalVal::Str(format!("Can't treat '{}' as list/vec", pr_str(self.clone(), true))))))
+        }
+    }
 }
