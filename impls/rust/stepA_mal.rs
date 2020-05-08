@@ -343,6 +343,8 @@ fn rep_lit(code: &str, env: &Rc<MalEnv>) {
 fn main() {
     let repl_env = Rc::new(MalEnv { outer: None, data: Rc::new(RefCell::new(HashMap::new())), id: 1 });
 
+    repl_env.set("*host-language*".to_string(), Str("rust".to_string()));
+
     for (k,v) in &core_ns() {
         repl_env.set(k.clone(), v.clone());
     }
@@ -354,13 +356,16 @@ fn main() {
     let argstar  = "*ARGV*".to_string();
     let mut argv = args();
     if argv.len() > 1 {
+        argv.next(); // Move past program name.
         let file = argv.next().unwrap();
         repl_env.set(
             argstar, as_mal_list![argv.map(|arg| Str(arg)).collect()]
         );
-        rep_lit(format!("(load-file {})", file).as_str(), &repl_env)
+        rep_lit(format!("(load-file \"{}\")", file).as_str(), &repl_env)
     }
     else {
+        rep_lit(r#"(println (str "Mal [" *host-language* "]"))"#, &repl_env);
+
         repl_env.set(argstar, mal_list![]);
         loop {
             print!("user> ");
@@ -369,6 +374,10 @@ fn main() {
             let mut input = String::new();
             match io::stdin().read_line(&mut input) {
                 Ok(_)  => {
+                    if input.len() == 0 {
+                        println!("\nkthxbye!");
+                        break;
+                    }
                     let result = rep(input, &repl_env);
                     println!("{}", result.map_or_else(|s| s, |e| e));
                 }

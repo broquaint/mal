@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::{self, Write};
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -501,6 +502,68 @@ pub fn core_ns() -> HashMap<String, MalVal> {
             Ok(as_mal_list![m.values().map(|v| v.clone()).collect()])
         } else {
             errf!("vals expects map, got: {}", v_to_str!(&args[0]))
+        }
+    });
+
+    add("readline", |args| {
+        if let Str(s) = &args[0] {
+            print!("{}", s);
+            io::stdout().flush().unwrap();
+        } else {
+            return errf!("readline expects a string, got: {}", v_to_str!(&args[0]))
+        }
+
+        let mut input = String::new();
+        match io::stdin().read_line(&mut input) {
+            Ok(_)  => {
+                if input.len() > 0 {
+                    Ok(Str(input.trim_end().to_string()))
+                } else {
+                    Ok(Nil)
+                }
+            }
+            Err(_) => err!("failed to read stdin?")
+        }
+    });
+
+    add("time-ms", |args| {
+        Ok(Nil)
+    });
+
+    add("meta", |args| {
+        Ok(Nil)
+    });
+
+    add("with-meta", |args| {
+        Ok(Nil)
+    });
+
+    add("fn?", |args| {
+        Ok(Bool(matches!(&args[0], CoreFun(_) | UserFun(_))))
+    });
+
+    add("string?", |args| {
+        Ok(Bool(matches!(&args[0], Str(_))))
+    });
+
+    add("number?", |args| {
+        Ok(Bool(matches!(&args[0], Int(_))))
+    });
+
+    add("conj", |args| {
+        match &args[0] {
+            List(l) => Ok(Nil),
+            Vector(l) => Ok(Nil),
+            _ => errf!("conj expects list/vector, got: {}", v_to_str!(&args[0]))
+        }
+    });
+
+    add("seq", |args| {
+        match &args[0] {
+            List(l) => Ok(Nil),
+            Vector(l) => Ok(Nil),
+            Str(s) => Ok(Nil),
+            _ => Ok(Nil),
         }
     });
 
