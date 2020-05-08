@@ -352,5 +352,16 @@ pub fn core_ns() -> HashMap<String, MalVal> {
         as_mal_err!(args[0].clone())
     });
 
+    add("apply", |args| {
+        let(fun, rest) = args.split_first().unwrap();
+        let(args_b, args_a) = rest.split_last().unwrap();
+        let last_arg = args_b.as_vec()?;
+        match &fun {
+            CoreFun(f) => f(&[&args_a[..], &last_arg[..]].concat()),
+            UserFun(f) => call_user_fun(f, &[&args_a[..], &last_arg[..]].concat()),
+            _ => errf!("expected (apply f args? args) got (apply {} args? {})", pr_str(fun.clone(), true), pr_str(args_b.clone(), true))
+        }
+    });
+
     return ns
 }
