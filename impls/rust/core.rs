@@ -3,6 +3,7 @@ use std::io::{self, Write};
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::time::SystemTime;
 
 use env::MalEnv;
 use reader::read_str;
@@ -100,7 +101,7 @@ fn int_op(args: &[MalVal], fun: fn(i64, i64) -> i64) -> MalRet {
     if args.len() == 2 {
         match (&args[0], &args[1]) {
             (Int(a), Int(b)) => Ok(Int(fun(*a, *b))),
-            _ => err!("Can only operate on two ints")
+            _ => errf!("Can only operate on two ints, got: {} & {}", v_to_str!(&args[0]), v_to_str!(&args[1]))
         }
     }
     else {
@@ -526,15 +527,17 @@ pub fn core_ns() -> HashMap<String, MalVal> {
         }
     });
 
-    add("time-ms", |args| {
+    add("time-ms", |_| {
+        SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)
+            .map_or_else(|_| err!("now is before the unix epoch!?"),
+                         |n| Ok(Int(n.as_millis() as i64)))
+    });
+
+    add("meta", |_args| {
         Ok(Nil)
     });
 
-    add("meta", |args| {
-        Ok(Nil)
-    });
-
-    add("with-meta", |args| {
+    add("with-meta", |_args| {
         Ok(Nil)
     });
 
@@ -552,17 +555,17 @@ pub fn core_ns() -> HashMap<String, MalVal> {
 
     add("conj", |args| {
         match &args[0] {
-            List(l) => Ok(Nil),
-            Vector(l) => Ok(Nil),
+            List(_l) => Ok(Nil),
+            Vector(_l) => Ok(Nil),
             _ => errf!("conj expects list/vector, got: {}", v_to_str!(&args[0]))
         }
     });
 
     add("seq", |args| {
         match &args[0] {
-            List(l) => Ok(Nil),
-            Vector(l) => Ok(Nil),
-            Str(s) => Ok(Nil),
+            List(_l) => Ok(Nil),
+            Vector(_l) => Ok(Nil),
+            Str(_s) => Ok(Nil),
             _ => Ok(Nil),
         }
     });

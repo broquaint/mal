@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 use std::env::args;
 use std::io::{self, Write};
 use std::collections::HashMap;
@@ -379,7 +381,7 @@ fn main() {
                         break;
                     }
                     let result = rep(input, &repl_env);
-                    println!("{}", result.map_or_else(|s| s, |e| e));
+                    println!("{}", result.map_or_else(|err| err, |val| val));
                 }
                 Err(_) => { break; }
             }
