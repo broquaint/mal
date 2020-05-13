@@ -6,6 +6,9 @@ use regex::Captures;
 
 use ::mal_list;
 use types::MalVal::{self, Int, Sym, Bool, Str, List, Vector, Nil, Map};
+use types::VecLike;
+
+type ReaderRet = Result<MalVal, String>;
 
 #[derive(Debug)]
 struct Reader {
@@ -82,7 +85,7 @@ pub fn make_keyword(kw: &str) -> String {
     format!("{}{}", KW_PREFIX, kw)
 }
 
-fn read_atom(r: &mut Reader) -> Result<MalVal, String> {
+fn read_atom(r: &mut Reader) -> ReaderRet {
     let tok = r.next()?;
     // Handle quote specifically to avoid panic.
     if tok.starts_with("\"") || tok.starts_with(":") {
@@ -153,15 +156,16 @@ fn read_seq(r: &mut Reader, end: &str) -> Result<Vec<MalVal>, String> {
     return Ok(list);
 }
 
-fn read_list(r: &mut Reader) -> Result<MalVal, String> {
-    Ok(List(Rc::new(read_seq(r, ")")?)))
+fn read_list(r: &mut Reader) -> ReaderRet {
+    // Not using as_mal_list! in sympathy with read_vec.
+    Ok(List(VecLike { v: Box::new(read_seq(r, ")")?), meta: Box::new(Nil) }))
 }
 
-fn read_vec(r: &mut Reader) -> Result<MalVal, String> {
-    Ok(Vector(Rc::new(read_seq(r, "]")?)))
+fn read_vec(r: &mut Reader) -> ReaderRet {
+    Ok(Vector(VecLike { v: Box::new(read_seq(r, "]")?), meta: Box::new(Nil) }))
 }
 
-fn read_map(r: &mut Reader) -> Result<MalVal, String> {
+fn read_map(r: &mut Reader) -> ReaderRet {
     let pairs = read_seq(r, "}")?;
 
     if pairs.len() % 2 == 0 {
@@ -179,7 +183,7 @@ fn read_map(r: &mut Reader) -> Result<MalVal, String> {
     }
 }
 
-fn read_form(r: &mut Reader) -> Result<MalVal, String> {
+fn read_form(r: &mut Reader) -> ReaderRet {
     let tok = r.peek()?;
 //    println!("rf tok = {}", tok);
     match tok.as_str() {
@@ -190,6 +194,6 @@ fn read_form(r: &mut Reader) -> Result<MalVal, String> {
     }
 }
 
-pub fn read_str(input: String) -> Result<MalVal, String> {
+pub fn read_str(input: String) -> ReaderRet {
     read_form(&mut tokenize(input))
 }
