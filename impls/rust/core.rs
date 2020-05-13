@@ -16,6 +16,7 @@ use types::MalFnSig;
 use types::MalUserFn;
 use types::MalErr;
 use types::MalRet;
+use types::VecLike;
 
 #[macro_export]
 macro_rules! as_mal_err {
@@ -36,12 +37,14 @@ macro_rules! err {
 
 #[macro_export]
 macro_rules! as_mal_list {
-    ($e:expr) => { List(Rc::new($e)) }
+    ($e:expr) => { List(VecLike { v: Box::new($e), meta: Box::new(Nil) }) }
 }
 
 #[macro_export]
 macro_rules! mal_list {
-    ($($e:expr),*) => { List(Rc::new(vec![$($e),*])) }
+    ($($e:expr),*) => {
+        List(VecLike { v: Box::new(vec![$($e),*]), meta: Box::new(Nil) })
+    }
 }
 
 macro_rules! v_to_str {
@@ -85,7 +88,7 @@ fn mal_eq(this: &MalVal, that: &MalVal) -> bool {
     }
 }
 
-fn compare_lists(this: &Rc<Vec<MalVal>>, that: &Rc<Vec<MalVal>>) -> bool {
+fn compare_lists(this: &VecLike, that: &VecLike) -> bool {
     this.len() == that.len() &&
         (0 .. this.len()).all(|idx| { mal_eq(&this[idx], &that[idx]) })
 }
@@ -124,14 +127,14 @@ fn read_file(path: &String) -> MalRet {
     }
 }
 
-pub fn make_bound_env(env: &Rc<MalEnv>, binds: &Rc<Vec<MalVal>>, args: &[MalVal]) -> Result<MalEnv, MalErr> {
+pub fn make_bound_env(env: &Rc<MalEnv>, binds: &Box<VecLike>, args: &[MalVal]) -> Result<MalEnv, MalErr> {
     let mut params = HashMap::new();
 
     for idx in 0 .. binds.len() {
-        match &binds[idx] {
+        match &binds.v[idx] {
             Sym(s) => {
                 if s == "&" {
-                    if let Sym(rest_bind) = &binds[idx + 1] {
+                    if let Sym(rest_bind) = &binds.v[idx + 1] {
                         let rest_args = &args[idx .. args.len()];
                         params.insert(rest_bind.clone(), as_mal_list!(rest_args.to_vec()));
                         break;
@@ -206,7 +209,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
     });
 
     add("list", |args| {
-        Ok(List(Rc::new(args.to_vec())))
+        Ok(as_mal_list![args.to_vec()])
     });
 
     add("list?", |args| {
@@ -347,7 +350,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
                     Ok(mal_list![])
                 }
                 else {
-                    Ok(as_mal_list![l[1 ..].to_vec()])
+                    Ok(as_mal_list![l.v[1 ..].to_vec()])
                 }
             }
             Nil => Ok(mal_list![]),
@@ -411,7 +414,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
     });
 
     add("vector", |args| {
-        Ok(Vector(Rc::new(args.to_vec())))
+        Ok(Vector(VecLike { v: Box::new(args.to_vec()), meta: Box::new(Nil) }))
     });
 
     add("vector?", |args| {

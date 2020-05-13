@@ -13,6 +13,7 @@ use types::MalVal::{self, *};
 use types::MalUserFn;
 use types::MalRet;
 use types::MalErr;
+use types::VecLike;
 mod reader;
 use reader::read_str;
 use reader::mal_sym;
@@ -47,7 +48,7 @@ fn eval_ast(ast: Rc<MalVal>, menv: &Rc<MalEnv>) -> MalRet {
             for v in l.iter() {
                 new_vec.push(ervl!(v, menv)?);
             }
-            Ok(Vector(Rc::new(new_vec)))
+            Ok(Vector(VecLike { v: Box::new(new_vec), meta: Box::new(Nil) }))
         },
         Map(l) => {
             let mut new_map: HashMap<String, MalVal> = HashMap::new();
@@ -70,7 +71,7 @@ fn is_true(cond: MalVal) -> bool {
     }
 }
 
-fn make_env(binds: &Rc<Vec<MalVal>>, outer_env: &Rc<MalEnv>) -> Result<Rc<MalEnv>, MalErr> {
+fn make_env(binds: &VecLike, outer_env: &Rc<MalEnv>) -> Result<Rc<MalEnv>, MalErr> {
     let new_env = Rc::new(MalEnv {
         outer: Some(Rc::clone(outer_env)),
         data:  Rc::new(RefCell::new(HashMap::new())),
@@ -97,14 +98,14 @@ fn make_env(binds: &Rc<Vec<MalVal>>, outer_env: &Rc<MalEnv>) -> Result<Rc<MalEnv
 fn quasiquote(ast: MalVal) -> MalVal {
     match ast {
         List(l) | Vector(l) if !l.is_empty() => {
-            let(head, tail) = l.split_first().unwrap();
+            let(head, tail) = l.split_first();
             match head {
                 Sym(s) if s == "unquote" => return tail[0].clone(),
                 List(l) | Vector(l) => {
                     // A chained if-let would make this a bit cleaner.
                     if let Sym(s) = &l[0] {
                         if s == "splice-unquote" {
-                            let(_, ht) = l.split_first().unwrap();
+                            let(_, ht) = l.split_first();
                             return mal_list![
                                 mal_sym("concat"), ht[0].clone(), quasiquote(as_mal_list![tail.to_vec()])
                             ]
@@ -140,7 +141,7 @@ fn is_macro_call(ast: Rc<MalVal>, env: &Rc<MalEnv>) -> Option<MalUserFn> {
 fn macroexpand(mut ast: Rc<MalVal>, env: &Rc<MalEnv>) -> Result<Rc<MalVal>, MalErr> {
     while let Some(f) = is_macro_call(Rc::clone(&ast), env) {
         if let List(l) = &*ast {
-            let (_, args) = l.split_first().unwrap();
+            let (_, args) = l.split_first();
             match call_user_fun(&f, args) {
                 Ok(next_ast) => { ast = Rc::new(next_ast); }
                 Err(e) => return Err(e)
@@ -167,8 +168,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                     return Ok(mal_list![])
                 }
                 else {
-                    // Shouldn't panic as we know l isn't empty.
-                    let (sym, rest) = l.split_first().unwrap();
+                    let (sym, rest) = l.split_first();
                     if let Sym(tok) = sym {
                         match tok.as_str() {
                             "def!" => {
@@ -246,7 +246,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                         ast = Rc::new(
                                             UserFun(
                                                 MalUserFn {
-                                                    binds:    bl.clone(),
+                                                    binds:    Box::new(bl.clone()),
                                                     body:     Rc::new(body.clone()),
                                                     env:      Rc::clone(&env.borrow()),
                                                     is_macro: false,
@@ -286,7 +286,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                             match (sym, bind) {
                                                 (Sym(s), Sym(_)) if s == "catch*" => {
                                                     // Only expect a single bind to the single error.
-                                                    let bindlist  = Rc::new(vec![bind.clone()]);
+                                                    let bindlist  = Box::new(VecLike { v: Box::new(vec![bind.clone()]), meta: Box::new(Nil) });
                                                     let catch_env = make_bound_env(&env.borrow(), &bindlist, &[err.to_val()])?;
                                                     EVAL(Rc::new(body.clone()), &Rc::new(catch_env))
                                                 }
@@ -304,7 +304,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                     }
 
                     return if let List(fcall) = eval_ast(ast, &env.borrow())? {
-                        let (fun, args) = fcall.split_first().unwrap();
+                        let (fun, args) = fcall.split_first();
                         call_fun(&fun, args)
                     }
                     else {
