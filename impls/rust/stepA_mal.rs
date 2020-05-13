@@ -14,6 +14,7 @@ use types::MalUserFn;
 use types::MalRet;
 use types::MalErr;
 use types::VecLike;
+use types::MapLike;
 mod reader;
 use reader::read_str;
 use reader::mal_sym;
@@ -50,13 +51,13 @@ fn eval_ast(ast: Rc<MalVal>, menv: &Rc<MalEnv>) -> MalRet {
             }
             Ok(Vector(VecLike { v: Box::new(new_vec), meta: Box::new(Nil) }))
         },
-        Map(l) => {
+        Map(m) => {
             let mut new_map: HashMap<String, MalVal> = HashMap::new();
             // Iterate with for-loop to raise the first Err encountered.
-            for (k, v) in l.iter() {
+            for (k, v) in m.iter() {
                 new_map.insert(k.clone(), ervl!(v, menv)?);
             }
-            Ok(Map(Rc::new(new_map)))
+            Ok(mal_map![new_map])
         },
         Sym(s) => menv.get(&s),
         v => Ok(v.clone())
