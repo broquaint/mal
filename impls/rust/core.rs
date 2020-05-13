@@ -17,6 +17,7 @@ use types::MalUserFn;
 use types::MalErr;
 use types::MalRet;
 use types::VecLike;
+use types::MapLike;
 
 #[macro_export]
 macro_rules! as_mal_err {
@@ -44,6 +45,13 @@ macro_rules! as_mal_list {
 macro_rules! mal_list {
     ($($e:expr),*) => {
         List(VecLike { v: Box::new(vec![$($e),*]), meta: Box::new(Nil) })
+    }
+}
+
+#[macro_export]
+macro_rules! mal_map {
+    ($e:expr) => {
+        Map(MapLike { v: Box::new($e), meta: Box::new(Nil) })
     }
 }
 
@@ -93,7 +101,7 @@ fn compare_lists(this: &VecLike, that: &VecLike) -> bool {
         (0 .. this.len()).all(|idx| { mal_eq(&this[idx], &that[idx]) })
 }
 
-fn compare_maps(this: &Rc<HashMap<String, MalVal>>, that: &Rc<HashMap<String, MalVal>>) -> bool {
+fn compare_maps(this: &MapLike, that: &MapLike) -> bool {
     this.len() == that.len() &&
         this.keys().all(|k| {
             that.contains_key(k) && mal_eq(this.get(k).unwrap(), that.get(k).unwrap())
@@ -436,7 +444,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
                     _      => return errf!("map keys can only be string or keyword, got: {}", v_to_str!(&pair[0]))
                 }
             }
-            Ok(Map(Rc::new(map)))
+            Ok(mal_map![map])
         }
     });
 
@@ -449,14 +457,14 @@ pub fn core_ns() -> HashMap<String, MalVal> {
         if rest.len() % 2 != 0 {
             errf!("assoc received an odd number of elements, got {} args", rest.len())
         } else if let Map(m) = src_map {
-            let mut map : HashMap<String, MalVal> = (**m).clone();
+            let mut map : HashMap<String, MalVal> = *m.v.clone();
             for pair in rest.chunks(2) {
                 match &pair[0] {
                     Str(s) => { map.insert(s.clone(), pair[1].clone()); }
                     _      => return errf!("map keys can only be string or keyword, got: {}", v_to_str!(&pair[0]))
                 }
             }
-            Ok(Map(Rc::new(map)))
+            Ok(mal_map![map])
         } else {
             errf!("assoc expects map, got: {}", v_to_str!(src_map))
         }
@@ -465,14 +473,15 @@ pub fn core_ns() -> HashMap<String, MalVal> {
     add("dissoc", |args| {
         let (src_map, rest) = args.split_first().unwrap();
         if let Map(m) = src_map {
-            let mut map : HashMap<String, MalVal> = (**m).clone();
+            let mut map : HashMap<String, MalVal> = *m.v.clone();
             for k in rest {
                 match &k {
                     Str(s) => { map.remove(s); }
                     _      => return errf!("map keys can only be string or keyword, got: {}", v_to_str!(k))
                 }
             }
-            Ok(Map(Rc::new(map)))
+
+            Ok(mal_map![map])
         } else {
             errf!("dissoc expects map, got: {}", v_to_str!(src_map))
         }

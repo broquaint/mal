@@ -3,8 +3,11 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use std::ops::Index;
-use std::slice::Iter;
+use std::slice::Iter as SliceIter;
 use std::slice::Chunks;
+use std::collections::hash_map::Keys;
+use std::collections::hash_map::Values;
+use std::collections::hash_map::Iter as MapIter;
 
 use env::MalEnv;
 use printer::pr_str;
@@ -38,17 +41,8 @@ pub struct VecLike {
     pub meta: Box<MalVal>,
 }
 
+// Implement some commonly used Vec methods, hence VecLike
 impl VecLike {
-    pub fn new(v: MalVal) -> VecLike {
-        VecLike { v: Box::new(vec![v]), meta: Box::new(MalVal::Nil) }
-    }
-
-    pub fn from_vec(vv: Vec<MalVal>) -> VecLike {
-        VecLike { v: Box::new(vv), meta: Box::new(MalVal::Nil) }
-    }
-
-    // Implement some commonly used Vec methods, hence VecLike
-
     pub fn len(&self) -> usize {
         self.v.len()
     }
@@ -57,7 +51,7 @@ impl VecLike {
         self.v.is_empty()
     }
 
-    pub fn iter(&self) -> Iter<MalVal> {
+    pub fn iter(&self) -> SliceIter<MalVal> {
         self.v.iter()
     }
 
@@ -84,6 +78,38 @@ impl Index<usize> for VecLike {
 }
 
 #[derive(Clone)]
+pub struct MapLike {
+    pub v:    Box<HashMap<String, MalVal>>,
+    pub meta: Box<MalVal>,
+}
+
+impl MapLike {
+    pub fn len(&self) -> usize {
+        self.v.len()
+    }
+
+    pub fn iter(&self) -> MapIter<String, MalVal> {
+        self.v.iter()
+    }
+
+    pub fn keys(&self) -> Keys<String, MalVal> {
+        self.v.keys()
+    }
+
+    pub fn values(&self) -> Values<String, MalVal> {
+        self.v.values()
+    }
+
+    pub fn get(&self, k: &String) -> Option<&MalVal> {
+        self.v.get(k)
+    }
+
+    pub fn contains_key(&self, k: &String) -> bool {
+        self.v.contains_key(k)
+    }
+}
+
+#[derive(Clone)]
 pub enum MalVal {
     Int(i64),
     Str(String),
@@ -92,7 +118,7 @@ pub enum MalVal {
     Nil,
     List(VecLike),
     Vector(VecLike),
-    Map(Rc<HashMap<String, MalVal>>),
+    Map(MapLike),
     UserFun(MalUserFn),
     CoreFun(MalFnSig),
     Atom(Rc<RefCell<MalVal>>),

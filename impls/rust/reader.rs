@@ -1,12 +1,13 @@
-use std::rc::Rc;
 use std::collections::HashMap;
 
 use regex::Regex;
 use regex::Captures;
 
 use ::mal_list;
+use ::mal_map;
 use types::MalVal::{self, Int, Sym, Bool, Str, List, Vector, Nil, Map};
 use types::VecLike;
+use types::MapLike;
 
 type ReaderRet = Result<MalVal, String>;
 
@@ -176,7 +177,7 @@ fn read_map(r: &mut Reader) -> ReaderRet {
                 _      => return Err("only Str can be use as a map key".to_string())
             }
         }
-        Ok(Map(Rc::new(map)))
+        Ok(mal_map![map])
     }
     else {
         Err(format!("maps requires an even number of items, got {} items", pairs.len()))
