@@ -3,10 +3,12 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use types::MalVal::Str;
 use types::MalVal;
 use types::MalErr;
 use types::MalRet;
+
+use ::as_mal_err;
+use ::errf;
 
 #[derive(Clone)]
 pub struct MalEnv {
@@ -48,7 +50,7 @@ impl MalEnv {
         }
         else {
             // errf! would be nicer but failing at macro use/export.
-            Err(MalErr(Rc::new(Str(format!("'{}' not found", k)))))
+            errf!("'{}' not found", k)
         }
     }
 }
