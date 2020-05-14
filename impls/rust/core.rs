@@ -28,7 +28,7 @@ macro_rules! as_mal_err {
 #[macro_export]
 macro_rules! errf {
     ($fmt:expr, $($e:expr),*) => {
-        as_mal_err!(Str(format!($fmt, $($e),*)))
+        as_mal_err!(MalVal::Str(format!($fmt, $($e),*)))
     }
 }
 
@@ -52,6 +52,7 @@ macro_rules! mal_map {
     ($e:expr) => { MapLike::as_map($e) }
 }
 
+#[macro_export]
 macro_rules! v_to_str {
     ($e:expr) => { pr_str($e.clone(), true) }
 }
