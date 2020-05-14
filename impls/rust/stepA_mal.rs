@@ -245,15 +245,13 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                 match binds {
                                     List(bl) | Vector(bl) => {
                                         ast = Rc::new(
-                                            UserFun(
-                                                MalUserFn {
-                                                    binds:    Box::new(bl.clone()),
-                                                    body:     Rc::new(body.clone()),
-                                                    env:      Rc::clone(&env.borrow()),
-                                                    is_macro: false,
-                                                    // Allow calling user functions in core.
-                                                    eval:  EVAL
-                                                }
+                                            MalUserFn::as_fun(
+                                                bl.clone(),
+                                                body.clone(),
+                                                Rc::clone(&env.borrow()),
+                                                false,
+                                                // Allow calling user functions in core.
+                                                EVAL
                                             )
                                         );
                                         continue 'eval_loop

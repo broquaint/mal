@@ -19,14 +19,45 @@ use ::v_to_str;
 pub type MalRet   = Result<MalVal, MalErr>;
 pub type MalFnSig = fn(&[MalVal]) -> MalRet;
 
+// Probably gross way of exposing EVAL into core.
+type EvalSig = fn(Rc<MalVal>, &Rc<MalEnv>) -> MalRet;
+
 #[derive(Clone)]
 pub struct MalUserFn {
     pub binds:    Box<VecLike>,
     pub body:     Rc<MalVal>,
     pub env:      Rc<MalEnv>,
     pub is_macro: bool,
-    // Probably gross way of exposing EVAL into core.
-    pub eval:  fn(Rc<MalVal>, &Rc<MalEnv>) -> MalRet,
+    pub eval:     EvalSig,
+    _meta:        Box<MalVal>,
+}
+
+impl MalUserFn {
+    pub fn new(binds: VecLike, body: MalVal, env: Rc<MalEnv>, is_macro: bool, eval: EvalSig, meta: MalVal) -> MalUserFn {
+        MalUserFn {
+            binds:    Box::new(binds),
+            body:     Rc::new(body),
+            env,
+            is_macro,
+            eval,
+            _meta: Box::new(meta)
+        }
+    }
+
+    pub fn as_fun(binds: VecLike, body: MalVal, env: Rc<MalEnv>, is_macro: bool, eval: EvalSig) -> MalVal {
+        MalVal::UserFun(MalUserFn::new(binds, body, env, is_macro, eval, MalVal::Nil))
+    }
+
+    pub fn with_meta(&self, val: &MalVal) -> MalUserFn {
+        MalUserFn::new(
+            *self.binds.clone(),
+            (*self.body).clone(),
+            Rc::clone(&self.env),
+            self.is_macro,
+            self.eval,
+            val.clone()
+        )
+    }
 }
 
 #[derive(Clone)]
@@ -157,16 +188,17 @@ pub trait HasMeta {
     }
 }
 
+
+impl HasMeta for MalUserFn {
+    fn get_meta(&self) -> &MalVal { &*self._meta }
+}
+
 impl HasMeta for VecLike {
-    fn get_meta(&self) -> &MalVal {
-        &*self._meta
-    }
+    fn get_meta(&self) -> &MalVal { &*self._meta }
 }
 
 impl HasMeta for MapLike {
-    fn get_meta(&self) -> &MalVal {
-        &*self._meta
-    }
+    fn get_meta(&self) -> &MalVal { &*self._meta }
 }
 
 #[derive(Clone)]
