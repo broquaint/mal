@@ -49,7 +49,7 @@ fn eval_ast(ast: Rc<MalVal>, menv: &Rc<MalEnv>) -> MalRet {
             for v in l.iter() {
                 new_vec.push(ervl!(v, menv)?);
             }
-            Ok(Vector(VecLike { v: Box::new(new_vec), meta: Box::new(Nil) }))
+            Ok(VecLike::as_vec(new_vec))
         },
         Map(m) => {
             let mut new_map: HashMap<String, MalVal> = HashMap::new();
@@ -287,8 +287,8 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                             match (sym, bind) {
                                                 (Sym(s), Sym(_)) if s == "catch*" => {
                                                     // Only expect a single bind to the single error.
-                                                    let bindlist  = Box::new(VecLike { v: Box::new(vec![bind.clone()]), meta: Box::new(Nil) });
-                                                    let catch_env = make_bound_env(&env.borrow(), &bindlist, &[err.to_val()])?;
+                                                    let bindlist  = VecLike::new(vec![bind.clone()], Nil);
+                                                    let catch_env = make_bound_env(&env.borrow(), &Box::new(bindlist), &[err.to_val()])?;
                                                     EVAL(Rc::new(body.clone()), &Rc::new(catch_env))
                                                 }
                                                 (_, err) => errf!("Expected catch*, got {}", pr_str(err.clone(), true))

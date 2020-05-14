@@ -37,12 +37,28 @@ impl MalErr {
 
 #[derive(Clone)]
 pub struct VecLike {
-    pub v:    Box<Vec<MalVal>>,
-    pub meta: Box<MalVal>,
+    v:    Box<Vec<MalVal>>,
+    _meta: Box<MalVal>,
 }
 
 // Implement some commonly used Vec methods, hence VecLike
 impl VecLike {
+    pub fn new(val: Vec<MalVal>, meta: MalVal) -> VecLike {
+        VecLike { v: Box::new(val), _meta: Box::new(meta) }
+    }
+
+    pub fn with_meta(&self, meta: &MalVal) -> VecLike {
+        VecLike::new(*self.v.clone(), meta.clone())
+    }
+
+    pub fn as_list(val: Vec<MalVal>) -> MalVal {
+        MalVal::List(VecLike::new(val, MalVal::Nil))
+    }
+
+    pub fn as_vec(val: Vec<MalVal>) -> MalVal {
+        MalVal::Vector(VecLike::new(val, MalVal::Nil))
+    }
+
     pub fn len(&self) -> usize {
         self.v.len()
     }
@@ -67,6 +83,10 @@ impl VecLike {
         // We only call split_first() when it's safe to unwrap.
         self.v.split_first().unwrap()
     }
+
+    pub fn rest(&self) -> MalVal {
+        VecLike::as_list(self.v[1 ..].to_vec())
+    }
 }
 
 impl Index<usize> for VecLike {
@@ -79,11 +99,27 @@ impl Index<usize> for VecLike {
 
 #[derive(Clone)]
 pub struct MapLike {
-    pub v:    Box<HashMap<String, MalVal>>,
-    pub meta: Box<MalVal>,
+    v:     Box<HashMap<String, MalVal>>,
+    _meta: Box<MalVal>,
 }
 
 impl MapLike {
+    pub fn new(val: HashMap<String, MalVal>, meta: MalVal) -> MapLike {
+        MapLike { v: Box::new(val), _meta: Box::new(meta) }
+    }
+
+    pub fn as_map(val: HashMap<String, MalVal>) -> MalVal {
+        MalVal::Map(MapLike::new(val, MalVal::Nil))
+    }
+
+    pub fn with_meta(&self, val: &MalVal) -> MapLike {
+        MapLike::new(*self.v.clone(), val.clone())
+    }
+
+    pub fn clone_map(&self) -> HashMap<String, MalVal> {
+        *self.v.clone()
+    }
+
     pub fn len(&self) -> usize {
         self.v.len()
     }
@@ -106,6 +142,26 @@ impl MapLike {
 
     pub fn contains_key(&self, k: &String) -> bool {
         self.v.contains_key(k)
+    }
+}
+
+pub trait HasMeta {
+    fn get_meta(&self) -> &MalVal;
+
+    fn meta(&self) -> MalVal {
+        (*self.get_meta()).clone()
+    }
+}
+
+impl HasMeta for VecLike {
+    fn get_meta(&self) -> &MalVal {
+        &*self._meta
+    }
+}
+
+impl HasMeta for MapLike {
+    fn get_meta(&self) -> &MalVal {
+        &*self._meta
     }
 }
 
