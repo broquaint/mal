@@ -5,7 +5,7 @@ use regex::Captures;
 
 use ::mal_list;
 use ::mal_map;
-use types::MalVal::{self, Int, Sym, Bool, Str, List, Vector, Nil, Map};
+use types::MalVal::{self, Int, Sym, Bool, Str, Nil};
 use types::VecLike;
 use types::MapLike;
 
@@ -159,11 +159,11 @@ fn read_seq(r: &mut Reader, end: &str) -> Result<Vec<MalVal>, String> {
 
 fn read_list(r: &mut Reader) -> ReaderRet {
     // Not using as_mal_list! in sympathy with read_vec.
-    Ok(List(VecLike { v: Box::new(read_seq(r, ")")?), meta: Box::new(Nil) }))
+    Ok(VecLike::as_list(read_seq(r, ")")?))
 }
 
 fn read_vec(r: &mut Reader) -> ReaderRet {
-    Ok(Vector(VecLike { v: Box::new(read_seq(r, "]")?), meta: Box::new(Nil) }))
+    Ok(VecLike::as_vec(read_seq(r, "]")?))
 }
 
 fn read_map(r: &mut Reader) -> ReaderRet {

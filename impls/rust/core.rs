@@ -18,6 +18,7 @@ use types::MalErr;
 use types::MalRet;
 use types::VecLike;
 use types::MapLike;
+use types::HasMeta;
 
 #[macro_export]
 macro_rules! as_mal_err {
@@ -38,21 +39,17 @@ macro_rules! err {
 
 #[macro_export]
 macro_rules! as_mal_list {
-    ($e:expr) => { List(VecLike { v: Box::new($e), meta: Box::new(Nil) }) }
+    ($e:expr) => { VecLike::as_list($e) }
 }
 
 #[macro_export]
 macro_rules! mal_list {
-    ($($e:expr),*) => {
-        List(VecLike { v: Box::new(vec![$($e),*]), meta: Box::new(Nil) })
-    }
+    ($($e:expr),*) => { VecLike::as_list(vec![$($e),*]) }
 }
 
 #[macro_export]
 macro_rules! mal_map {
-    ($e:expr) => {
-        Map(MapLike { v: Box::new($e), meta: Box::new(Nil) })
-    }
+    ($e:expr) => { MapLike::as_map($e) }
 }
 
 macro_rules! v_to_str {
@@ -139,10 +136,10 @@ pub fn make_bound_env(env: &Rc<MalEnv>, binds: &Box<VecLike>, args: &[MalVal]) -
     let mut params = HashMap::new();
 
     for idx in 0 .. binds.len() {
-        match &binds.v[idx] {
+        match &binds[idx] {
             Sym(s) => {
                 if s == "&" {
-                    if let Sym(rest_bind) = &binds.v[idx + 1] {
+                    if let Sym(rest_bind) = &binds[idx + 1] {
                         let rest_args = &args[idx .. args.len()];
                         params.insert(rest_bind.clone(), as_mal_list!(rest_args.to_vec()));
                         break;
@@ -358,7 +355,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
                     Ok(mal_list![])
                 }
                 else {
-                    Ok(as_mal_list![l.v[1 ..].to_vec()])
+                    Ok(l.rest())
                 }
             }
             Nil => Ok(mal_list![]),
@@ -422,7 +419,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
     });
 
     add("vector", |args| {
-        Ok(Vector(VecLike { v: Box::new(args.to_vec()), meta: Box::new(Nil) }))
+        Ok(VecLike::as_vec(args.to_vec()))
     });
 
     add("vector?", |args| {
@@ -457,7 +454,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
         if rest.len() % 2 != 0 {
             errf!("assoc received an odd number of elements, got {} args", rest.len())
         } else if let Map(m) = src_map {
-            let mut map : HashMap<String, MalVal> = *m.v.clone();
+            let mut map : HashMap<String, MalVal> = m.clone_map();
             for pair in rest.chunks(2) {
                 match &pair[0] {
                     Str(s) => { map.insert(s.clone(), pair[1].clone()); }
@@ -473,7 +470,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
     add("dissoc", |args| {
         let (src_map, rest) = args.split_first().unwrap();
         if let Map(m) = src_map {
-            let mut map : HashMap<String, MalVal> = *m.v.clone();
+            let mut map : HashMap<String, MalVal> = m.clone_map();
             for k in rest {
                 match &k {
                     Str(s) => { map.remove(s); }
@@ -545,12 +542,26 @@ pub fn core_ns() -> HashMap<String, MalVal> {
                          |n| Ok(Int(n.as_millis() as i64)))
     });
 
-    add("meta", |_args| {
-        Ok(Nil)
+    add("meta", |args| {
+        Ok(
+            match &args[0] {
+                List(l) | Vector(l) => l.meta(),
+                Map(m) => m.meta(),
+                _ => Nil
+            }
+        )
     });
 
-    add("with-meta", |_args| {
-        Ok(Nil)
+    add("with-meta", |args| {
+        Ok(
+            match &args[0] {
+                List(l)   => List(l.with_meta(&args[1])),
+                Vector(l) => Vector(l.with_meta(&args[1])),
+                Map(m)    => Map(m.with_meta(&args[1])),
+                _ => Nil
+            }
+        )
+
     });
 
     add("fn?", |args| {
