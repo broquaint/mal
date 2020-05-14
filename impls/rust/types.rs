@@ -23,13 +23,33 @@ pub type MalFnSig = fn(&[MalVal]) -> MalRet;
 type EvalSig = fn(Rc<MalVal>, &Rc<MalEnv>) -> MalRet;
 
 #[derive(Clone)]
+pub struct MalCoreFn {
+    pub fun:  MalFnSig,
+    meta_val: Box<MalVal>,
+}
+
+impl MalCoreFn {
+    pub fn new(fun: MalFnSig, meta: MalVal) -> MalCoreFn {
+        MalCoreFn { fun, meta_val: Box::new(meta) }
+    }
+
+    pub fn as_fun(fun: MalFnSig) -> MalVal {
+        MalVal::CoreFun(MalCoreFn::new(fun, MalVal::Nil))
+    }
+
+    pub fn with_meta(&self, val: &MalVal) -> MalCoreFn {
+        MalCoreFn::new(self.fun, val.clone())
+    }
+}
+
+#[derive(Clone)]
 pub struct MalUserFn {
     pub binds:    Box<VecLike>,
     pub body:     Rc<MalVal>,
     pub env:      Rc<MalEnv>,
     pub is_macro: bool,
     pub eval:     EvalSig,
-    _meta:        Box<MalVal>,
+    meta_val:     Box<MalVal>,
 }
 
 impl MalUserFn {
@@ -40,7 +60,7 @@ impl MalUserFn {
             env,
             is_macro,
             eval,
-            _meta: Box::new(meta)
+            meta_val: Box::new(meta)
         }
     }
 
@@ -73,13 +93,13 @@ impl MalErr {
 #[derive(Clone)]
 pub struct VecLike {
     v:    Box<Vec<MalVal>>,
-    _meta: Box<MalVal>,
+    meta_val: Box<MalVal>,
 }
 
 // Implement some commonly used Vec methods, hence VecLike
 impl VecLike {
     pub fn new(val: Vec<MalVal>, meta: MalVal) -> VecLike {
-        VecLike { v: Box::new(val), _meta: Box::new(meta) }
+        VecLike { v: Box::new(val), meta_val: Box::new(meta) }
     }
 
     pub fn with_meta(&self, meta: &MalVal) -> VecLike {
@@ -135,12 +155,12 @@ impl Index<usize> for VecLike {
 #[derive(Clone)]
 pub struct MapLike {
     v:     Box<HashMap<String, MalVal>>,
-    _meta: Box<MalVal>,
+    meta_val: Box<MalVal>,
 }
 
 impl MapLike {
     pub fn new(val: HashMap<String, MalVal>, meta: MalVal) -> MapLike {
-        MapLike { v: Box::new(val), _meta: Box::new(meta) }
+        MapLike { v: Box::new(val), meta_val: Box::new(meta) }
     }
 
     pub fn as_map(val: HashMap<String, MalVal>) -> MalVal {
@@ -190,15 +210,19 @@ pub trait HasMeta {
 
 
 impl HasMeta for MalUserFn {
-    fn get_meta(&self) -> &MalVal { &*self._meta }
+    fn get_meta(&self) -> &MalVal { &*self.meta_val }
+}
+
+impl HasMeta for MalCoreFn {
+    fn get_meta(&self) -> &MalVal { &*self.meta_val }
 }
 
 impl HasMeta for VecLike {
-    fn get_meta(&self) -> &MalVal { &*self._meta }
+    fn get_meta(&self) -> &MalVal { &*self.meta_val }
 }
 
 impl HasMeta for MapLike {
-    fn get_meta(&self) -> &MalVal { &*self._meta }
+    fn get_meta(&self) -> &MalVal { &*self.meta_val }
 }
 
 #[derive(Clone)]
@@ -212,7 +236,7 @@ pub enum MalVal {
     Vector(VecLike),
     Map(MapLike),
     UserFun(MalUserFn),
-    CoreFun(MalFnSig),
+    CoreFun(MalCoreFn),
     Atom(Rc<RefCell<MalVal>>),
 }
 

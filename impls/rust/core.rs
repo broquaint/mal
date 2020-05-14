@@ -14,6 +14,7 @@ use printer::rs_pr_str;
 use types::MalVal::{self, *};
 use types::MalFnSig;
 use types::MalUserFn;
+use types::MalCoreFn;
 use types::MalErr;
 use types::MalRet;
 use types::VecLike;
@@ -172,14 +173,14 @@ pub fn call_user_fun(fun: &MalUserFn, args: &[MalVal]) -> MalRet {
 
 pub fn call_fun(maybe_fun: &MalVal, args: &[MalVal]) -> MalRet {
     match maybe_fun {
-        CoreFun(f) => f(args),
+        CoreFun(f) => (f.fun)(args),
         UserFun(f) => call_user_fun(f, args),
         _ => errf!("can't treat this as a function: {}", v_to_str!(maybe_fun))
     }
 }
 
 fn add_to_core(ns: &mut HashMap<String, MalVal>, name: &str, fun: MalFnSig) {
-    ns.insert(name.to_string(), CoreFun(fun));
+    ns.insert(name.to_string(), MalCoreFn::as_fun(fun));
 }
 
 pub fn core_ns() -> HashMap<String, MalVal> {
@@ -548,6 +549,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
             match &args[0] {
                 List(l) | Vector(l) => l.meta(),
                 Map(m) => m.meta(),
+                CoreFun(f) => f.meta(),
                 UserFun(f) => f.meta(),
                 _ => Nil
             }
@@ -560,6 +562,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
                 List(l)    => List(l.with_meta(&args[1])),
                 Vector(l)  => Vector(l.with_meta(&args[1])),
                 Map(m)     => Map(m.with_meta(&args[1])),
+                CoreFun(f) => CoreFun(f.with_meta(&args[1])),
                 UserFun(f) => UserFun(f.with_meta(&args[1])),
                 _ => Nil
             }
