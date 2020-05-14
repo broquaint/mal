@@ -548,6 +548,7 @@ pub fn core_ns() -> HashMap<String, MalVal> {
             match &args[0] {
                 List(l) | Vector(l) => l.meta(),
                 Map(m) => m.meta(),
+                UserFun(f) => f.meta(),
                 _ => Nil
             }
         )
@@ -556,9 +557,10 @@ pub fn core_ns() -> HashMap<String, MalVal> {
     add("with-meta", |args| {
         Ok(
             match &args[0] {
-                List(l)   => List(l.with_meta(&args[1])),
-                Vector(l) => Vector(l.with_meta(&args[1])),
-                Map(m)    => Map(m.with_meta(&args[1])),
+                List(l)    => List(l.with_meta(&args[1])),
+                Vector(l)  => Vector(l.with_meta(&args[1])),
+                Map(m)     => Map(m.with_meta(&args[1])),
+                UserFun(f) => UserFun(f.with_meta(&args[1])),
                 _ => Nil
             }
         )
