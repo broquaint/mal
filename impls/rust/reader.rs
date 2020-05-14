@@ -127,6 +127,11 @@ fn read_atom(r: &mut Reader) -> ReaderRet {
     else if tok == "~@" {
         Ok(mal_list![mal_sym("splice-unquote"), read_form(r)?])
     }
+    else if tok == "^" {
+        let meta = read_form(r)?;
+        let val  = read_form(r)?;
+        Ok(mal_list![mal_sym("with-meta"), val, meta])
+    }
     else {   
         Ok(
             if is_number(tok) {
