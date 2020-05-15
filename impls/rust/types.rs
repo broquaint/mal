@@ -36,10 +36,6 @@ impl MalCoreFn {
     pub fn as_fun(fun: MalFnSig) -> MalVal {
         MalVal::CoreFun(MalCoreFn::new(fun, MalVal::Nil))
     }
-
-    pub fn with_meta(&self, val: &MalVal) -> MalCoreFn {
-        MalCoreFn::new(self.fun, val.clone())
-    }
 }
 
 #[derive(Clone)]
@@ -67,27 +63,6 @@ impl MalUserFn {
     pub fn as_fun(binds: VecLike, body: MalVal, env: Rc<MalEnv>, is_macro: bool, eval: EvalSig) -> MalVal {
         MalVal::UserFun(MalUserFn::new(binds, body, env, is_macro, eval, MalVal::Nil))
     }
-
-    pub fn with_meta(&self, val: &MalVal) -> MalUserFn {
-        MalUserFn::new(
-            *self.binds.clone(),
-            (*self.body).clone(),
-            Rc::clone(&self.env),
-            self.is_macro,
-            self.eval,
-            val.clone()
-        )
-    }
-}
-
-#[derive(Clone)]
-pub struct MalErr(pub Rc<MalVal>);
-
-impl MalErr {
-    pub fn to_val(self) -> MalVal {
-        let MalErr(r) = self;
-        (*r).clone()
-    }
 }
 
 #[derive(Clone)]
@@ -100,10 +75,6 @@ pub struct VecLike {
 impl VecLike {
     pub fn new(val: Vec<MalVal>, meta: MalVal) -> VecLike {
         VecLike { v: Box::new(val), meta_val: Box::new(meta) }
-    }
-
-    pub fn with_meta(&self, meta: &MalVal) -> VecLike {
-        VecLike::new(*self.v.clone(), meta.clone())
     }
 
     pub fn as_list(val: Vec<MalVal>) -> MalVal {
@@ -167,10 +138,6 @@ impl MapLike {
         MalVal::Map(MapLike::new(val, MalVal::Nil))
     }
 
-    pub fn with_meta(&self, val: &MalVal) -> MapLike {
-        MapLike::new(*self.v.clone(), val.clone())
-    }
-
     pub fn clone_map(&self) -> HashMap<String, MalVal> {
         *self.v.clone()
     }
@@ -200,29 +167,53 @@ impl MapLike {
     }
 }
 
-pub trait HasMeta {
+pub trait HasMeta<T> {
     fn get_meta(&self) -> &MalVal;
 
     fn meta(&self) -> MalVal {
         (*self.get_meta()).clone()
     }
+
+    fn with_meta(&self, val: &MalVal) -> T;
 }
 
-
-impl HasMeta for MalUserFn {
+impl HasMeta<MalCoreFn> for MalCoreFn {
     fn get_meta(&self) -> &MalVal { &*self.meta_val }
+
+    fn with_meta(&self, val: &MalVal) -> MalCoreFn {
+        MalCoreFn::new(self.fun, val.clone())
+    }
 }
 
-impl HasMeta for MalCoreFn {
+impl HasMeta<MalUserFn> for MalUserFn {
     fn get_meta(&self) -> &MalVal { &*self.meta_val }
+
+    fn with_meta(&self, val: &MalVal) -> MalUserFn {
+        MalUserFn::new(
+            *self.binds.clone(),
+            (*self.body).clone(),
+            Rc::clone(&self.env),
+            self.is_macro,
+            self.eval,
+            val.clone()
+        )
+    }
 }
 
-impl HasMeta for VecLike {
+impl HasMeta<VecLike> for VecLike {
     fn get_meta(&self) -> &MalVal { &*self.meta_val }
+
+    fn with_meta(&self, meta: &MalVal) -> VecLike {
+        VecLike::new(*self.v.clone(), meta.clone())
+    }
 }
 
-impl HasMeta for MapLike {
+impl HasMeta<MapLike> for MapLike {
     fn get_meta(&self) -> &MalVal { &*self.meta_val }
+
+    fn with_meta(&self, val: &MalVal) -> MapLike {
+        MapLike::new(*self.v.clone(), val.clone())
+    }
 }
 
 #[derive(Clone)]
@@ -246,5 +237,15 @@ impl MalVal {
             MalVal::List(l) | MalVal::Vector(l) => Ok(Rc::new(*l.v.clone())),
             _ => errf!("Can't treat '{}' as list/vec", v_to_str!(self))
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct MalErr(pub Rc<MalVal>);
+
+impl MalErr {
+    pub fn to_val(self) -> MalVal {
+        let MalErr(r) = self;
+        (*r).clone()
     }
 }
