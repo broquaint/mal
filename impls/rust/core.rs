@@ -566,11 +566,17 @@ pub fn core_ns() -> HashMap<String, MalVal> {
     });
 
     add("fn?", |args| {
-        Ok(Bool(matches!(&args[0], CoreFun(_) | UserFun(_))))
+        let res = matches!(&args[0], CoreFun(_))
+            || matches!(&args[0], UserFun(f) if !f.is_macro);
+        Ok(Bool(res))
+    });
+
+    add("macro?", |args| {
+        Ok(Bool(matches!(&args[0], UserFun(f) if f.is_macro)))
     });
 
     add("string?", |args| {
-        Ok(Bool(matches!(&args[0], Str(_))))
+        Ok(Bool(matches!(&args[0], Str(s) if !s.starts_with(KW_PREFIX))))
     });
 
     add("number?", |args| {
@@ -579,19 +585,31 @@ pub fn core_ns() -> HashMap<String, MalVal> {
 
     add("conj", |args| {
         match &args[0] {
-            List(_l) => Ok(Nil),
-            Vector(_l) => Ok(Nil),
+            List(l) => {
+                let mut rest = args[1 .. ].to_vec();
+                rest.reverse();
+                rest.extend_from_slice(l.as_slice());
+                Ok(as_mal_list![rest])
+            }
+            Vector(l) => {
+                let mut newvec = l.to_vec();
+                newvec.extend_from_slice(&args[1 .. ]);
+                Ok(VecLike::as_vec(newvec))
+            }
             _ => errf!("conj expects list/vector, got: {}", v_to_str!(&args[0]))
         }
     });
 
     add("seq", |args| {
-        match &args[0] {
-            List(_l) => Ok(Nil),
-            Vector(_l) => Ok(Nil),
-            Str(_s) => Ok(Nil),
-            _ => Ok(Nil),
-        }
+        Ok(
+            match &args[0] {
+                List(l)   if l.len() > 0 => args[0].clone(),
+                Vector(l) if l.len() > 0 => as_mal_list!(l.to_vec()),
+                Str(s)    if s.len() > 0 =>
+                    as_mal_list![s.chars().map(|c| Str(c.to_string())).collect()],
+                _ => Nil,
+            }
+        )
     });
 
     return ns
