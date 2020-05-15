@@ -13,6 +13,7 @@ use types::MalVal::{self, *};
 use types::MalUserFn;
 use types::MalRet;
 use types::MalErr;
+use types::MalCallable;
 use types::VecLike;
 use types::MapLike;
 mod reader;
@@ -25,7 +26,6 @@ use env::MalEnv;
 mod core;
 use core::core_ns; // Also exports err!, mlist! macros.
 use core::make_bound_env;
-use core::call_user_fun;
 use core::call_fun;
 
 // Simplify common EVAL use case where the first arg is cloned into a new Rc.
@@ -143,7 +143,7 @@ fn macroexpand(mut ast: Rc<MalVal>, env: &Rc<MalEnv>) -> Result<Rc<MalVal>, MalE
     while let Some(f) = is_macro_call(Rc::clone(&ast), env) {
         if let List(l) = &*ast {
             let (_, args) = l.split_first();
-            match call_user_fun(&f, args) {
+            match f.call(args) {
                 Ok(next_ast) => { ast = Rc::new(next_ast); }
                 Err(e) => return Err(e)
             }

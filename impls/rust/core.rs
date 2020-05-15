@@ -13,13 +13,13 @@ use printer::pr_str;
 use printer::rs_pr_str;
 use types::MalVal::{self, *};
 use types::MalFnSig;
-use types::MalUserFn;
 use types::MalCoreFn;
 use types::MalErr;
 use types::MalRet;
 use types::VecLike;
 use types::MapLike;
 use types::HasMeta;
+use types::MalCallable;
 
 #[macro_export]
 macro_rules! as_mal_err {
@@ -166,15 +166,10 @@ pub fn make_bound_env(env: &Rc<MalEnv>, binds: &Box<VecLike>, args: &[MalVal]) -
     Ok(MalEnv { outer: Some(Rc::clone(env)), data: Rc::new(RefCell::new(params)), id: env.id * 2 })
 }
 
-pub fn call_user_fun(fun: &MalUserFn, args: &[MalVal]) -> MalRet {
-    let inner_env = make_bound_env(&fun.env, &fun.binds, args)?;
-    Ok((fun.eval)(Rc::clone(&fun.body), &Rc::new(inner_env))?)
-}
-
 pub fn call_fun(maybe_fun: &MalVal, args: &[MalVal]) -> MalRet {
     match maybe_fun {
-        CoreFun(f) => (f.fun)(args),
-        UserFun(f) => call_user_fun(f, args),
+        CoreFun(f) => f.call(args),
+        UserFun(f) => f.call(args),
         _ => errf!("can't treat this as a function: {}", v_to_str!(maybe_fun))
     }
 }
