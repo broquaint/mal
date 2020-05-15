@@ -11,6 +11,7 @@ use std::collections::hash_map::Iter as MapIter;
 
 use env::MalEnv;
 use printer::pr_str;
+use core::make_bound_env;
 
 use ::as_mal_err;
 use ::errf;
@@ -65,6 +66,23 @@ impl MalUserFn {
     }
 }
 
+pub trait MalCallable {
+    fn call(&self, args: &[MalVal]) -> MalRet;
+}
+
+impl MalCallable for MalCoreFn {
+    fn call(&self, args: &[MalVal]) -> MalRet {
+        (self.fun)(args)
+    }
+}
+
+impl MalCallable for MalUserFn {
+    fn call(&self, args: &[MalVal]) -> MalRet {
+        let inner_env = make_bound_env(&self.env, &self.binds, args)?;
+        Ok((self.eval)(Rc::clone(&self.body), &Rc::new(inner_env))?)
+    }
+}
+
 #[derive(Clone)]
 pub struct VecLike {
     v:    Box<Vec<MalVal>>,
@@ -85,31 +103,38 @@ impl VecLike {
         MalVal::Vector(VecLike::new(val, MalVal::Nil))
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.v.len()
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.v.is_empty()
     }
 
+    #[inline]
     pub fn iter(&self) -> SliceIter<MalVal> {
         self.v.iter()
     }
 
+    #[inline]
     pub fn as_slice(&self) -> &[MalVal] {
         self.v.as_slice()
     }
 
+    #[inline]
     pub fn chunks(&self, chunk_size: usize) -> Chunks<MalVal> {
         self.v.chunks(chunk_size)
     }
 
+    #[inline]
     pub fn split_first(&self) -> (&MalVal, &[MalVal]) {
         // We only call split_first() when it's safe to unwrap.
         self.v.split_first().unwrap()
     }
 
+    #[inline]
     pub fn rest(&self) -> MalVal {
         VecLike::as_list(self.v[1 ..].to_vec())
     }
