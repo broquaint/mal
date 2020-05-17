@@ -11,7 +11,6 @@ use std::collections::hash_map::Iter as MapIter;
 
 use env::MalEnv;
 use printer::pr_str;
-use core::make_bound_env;
 
 use ::as_mal_err;
 use ::errf;
@@ -78,8 +77,8 @@ impl MalCallable for MalCoreFn {
 
 impl MalCallable for MalUserFn {
     fn call(&self, args: &[MalVal]) -> MalRet {
-        let inner_env = make_bound_env(&self.env, &self.binds, args)?;
-        Ok((self.eval)(Rc::clone(&self.body), &Rc::new(inner_env))?)
+        let inner_env = MalEnv::make_bound_env(&self.env, &self.binds, args)?;
+        Ok((self.eval)(Rc::clone(&self.body), &inner_env)?)
     }
 }
 

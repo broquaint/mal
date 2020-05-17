@@ -3,21 +3,75 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use types::MalVal;
+use types::MalVal::{self, *};
 use types::MalErr;
 use types::MalRet;
+use types::VecLike;
 
+use ::as_mal_list;
 use ::as_mal_err;
 use ::errf;
+use ::err;
 
 #[derive(Clone)]
 pub struct MalEnv {
-    pub outer: Option<Rc<MalEnv>>,
-    pub data:  Rc<RefCell<HashMap<String, MalVal>>>,
-    pub id:    i32
+    outer: Option<Rc<MalEnv>>,
+    data:  Rc<RefCell<HashMap<String, MalVal>>>,
+//    pub id:    i32
 }
 
 impl MalEnv {
+    pub fn make(outer: Option<Rc<MalEnv>>, params: HashMap<String, MalVal>) -> Rc<MalEnv> {
+        Rc::new(MalEnv {
+            outer: outer,
+            data:  Rc::new(RefCell::new(params)),
+        })
+    }
+
+    pub fn make_root() -> Rc<MalEnv> {
+        MalEnv::make(None, HashMap::new())
+    }
+
+    pub fn make_inner(outer_env: &Rc<MalEnv>) -> Rc<MalEnv> {
+        MalEnv::make(Some(Rc::clone(outer_env)), HashMap::new())
+    }
+
+    pub fn make_bound(outer_env: &Rc<MalEnv>, params: HashMap<String, MalVal>) -> Rc<MalEnv> {
+        MalEnv::make(Some(Rc::clone(outer_env)), params)
+    }
+
+    pub fn make_bound_env(env: &Rc<MalEnv>, binds: &Box<VecLike>, args: &[MalVal]) -> Result<Rc<MalEnv>, MalErr> {
+        let mut params = HashMap::new();
+    
+        for idx in 0 .. binds.len() {
+            match &binds[idx] {
+                Sym(s) => {
+                    if s == "&" {
+                        if let Sym(rest_bind) = &binds[idx + 1] {
+                            let rest_args = &args[idx .. args.len()];
+                            params.insert(rest_bind.clone(), as_mal_list!(rest_args.to_vec()));
+                            break;
+                        }
+                        else {
+                            return err!("Got a non-sym after & in binds")
+                        }
+                    }
+                    else {
+                        if idx < args.len() {
+                            params.insert(s.clone(), args[idx].clone());
+                        }
+                        else {
+                            return errf!("have {} binds but got {} args", binds.len(), args.len());
+                        }
+                    }
+                }
+                _ => return err!("Got a non-sym in fn*")
+            }
+        }
+    
+        Ok(MalEnv::make_bound(env, params))
+    }
+
     pub fn set(&self, k: String, v: MalVal) {
         self.data.deref().borrow_mut().insert(k, v.clone());
     }
@@ -55,12 +109,3 @@ impl MalEnv {
     }
 }
 
-impl ToString for MalEnv {
-    fn to_string(&self) -> String {
-        let oenv = match &self.outer {
-            Some(oe) => oe.id.to_string(),
-            None     => "root".to_string(),
-        };
-        format!("MalEnv<id: {}, outer_env: {}>", self.id, oenv)
-    }
-}
