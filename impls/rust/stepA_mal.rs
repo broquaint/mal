@@ -25,7 +25,6 @@ mod env;
 use env::MalEnv;
 mod core;
 use core::core_ns; // Also exports err!, mlist! macros.
-use core::make_bound_env;
 use core::call_fun;
 
 // Simplify common EVAL use case where the first arg is cloned into a new Rc.
@@ -73,11 +72,7 @@ fn is_true(cond: MalVal) -> bool {
 }
 
 fn make_env(binds: &VecLike, outer_env: &Rc<MalEnv>) -> Result<Rc<MalEnv>, MalErr> {
-    let new_env = Rc::new(MalEnv {
-        outer: Some(Rc::clone(outer_env)),
-        data:  Rc::new(RefCell::new(HashMap::new())),
-        id:    outer_env.id * 2,
-    });
+    let new_env = MalEnv::make_inner(outer_env);
 
     if binds.len() % 2 != 0 {
         return err!("binds for let* wasn't even")
@@ -286,8 +281,8 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                                 (Sym(s), Sym(_)) if s == "catch*" => {
                                                     // Only expect a single bind to the single error.
                                                     let bindlist  = VecLike::new(vec![bind.clone()], Nil);
-                                                    let catch_env = make_bound_env(&env.borrow(), &Box::new(bindlist), &[err.to_val()])?;
-                                                    EVAL(Rc::new(body.clone()), &Rc::new(catch_env))
+                                                    let catch_env = MalEnv::make_bound_env(&env.borrow(), &Box::new(bindlist), &[err.to_val()])?;
+                                                    EVAL(Rc::new(body.clone()), &catch_env)
                                                 }
                                                 (_, err) => errf!("Expected catch*, got {}", pr_str(err.clone(), true))
                                             }
@@ -342,7 +337,7 @@ fn rep_lit(code: &str, env: &Rc<MalEnv>) {
 }
 
 fn main() {
-    let repl_env = Rc::new(MalEnv { outer: None, data: Rc::new(RefCell::new(HashMap::new())), id: 1 });
+    let repl_env = MalEnv::make_root();
 
     repl_env.set("*host-language*".to_string(), Str("rust".to_string()));
 

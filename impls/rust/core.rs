@@ -5,7 +5,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-use env::MalEnv;
 use reader::read_str;
 use reader::make_keyword;
 use reader::KW_PREFIX;
@@ -132,38 +131,6 @@ fn read_file(path: &String) -> MalRet {
         Ok(data) => Ok(Str(String::from_utf8_lossy(&data).to_string())),
         Err(e) => err!(e)
     }
-}
-
-pub fn make_bound_env(env: &Rc<MalEnv>, binds: &Box<VecLike>, args: &[MalVal]) -> Result<MalEnv, MalErr> {
-    let mut params = HashMap::new();
-
-    for idx in 0 .. binds.len() {
-        match &binds[idx] {
-            Sym(s) => {
-                if s == "&" {
-                    if let Sym(rest_bind) = &binds[idx + 1] {
-                        let rest_args = &args[idx .. args.len()];
-                        params.insert(rest_bind.clone(), as_mal_list!(rest_args.to_vec()));
-                        break;
-                    }
-                    else {
-                        return err!("Got a non-sym after & in binds")
-                    }
-                }
-                else {
-                    if idx < args.len() {
-                        params.insert(s.clone(), args[idx].clone());
-                    }
-                    else {
-                        return errf!("have {} binds but got {} args", binds.len(), args.len());
-                    }
-                }
-            }
-            _ => return err!("Got a non-sym in fn*")
-        }
-    }
-
-    Ok(MalEnv { outer: Some(Rc::clone(env)), data: Rc::new(RefCell::new(params)), id: env.id * 2 })
 }
 
 pub fn call_fun(maybe_fun: &MalVal, args: &[MalVal]) -> MalRet {
