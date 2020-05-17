@@ -34,7 +34,7 @@ impl Reader {
             Ok(&self.tokens[self.pos])
         }
         else {
-            Err(String::from("Reached end of input unexpectedly in peek()"))
+            Err(format!("Reached end of input unexpectedly in peek() at pos {}", self.pos))
         }
     }
 
@@ -43,20 +43,14 @@ impl Reader {
     }
 }
 
-// [\s,]*(~@|[\[\]{}()'`~^@]|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"`,;)]*)
 fn tokenize(input: String) -> Reader {
-    let re = Regex::new(r#"[\s,]*(~@|[\[\]{}()'`~^@]|"(?:\\"|[^"])*"?|;.*|[^\s\[\]{}('"`,;)]*)[\s,]*"#).unwrap();
-    let mut tokens: Vec<String> = Vec::new();
-    // TODO, handle no match!
-    for tok in re.captures_iter(&input) {
-        let token = tok[0].trim().trim_matches(',');
-        // Skip empty tokens and comments.
-        if token.len() == 0 || token.starts_with(';') { continue }
-        tokens.push(String::from(token));
-    }
+    let re = Regex::new(r###"[\s,]*(~@|[\[\]{}()'`~^@]|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"`,;)]+)"###).unwrap();
 
-//    println!("input : {}", input);
-//    println!("tokens: {:?}", tokens);
+    let tokens = re.captures_iter(&input)
+        .map(|caps| caps[1].to_string())
+        .filter(|tok| tok.len() > 0 && !tok.starts_with(";"))
+        .collect();
+
     return Reader { pos: 0, tokens };
 }
 
