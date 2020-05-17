@@ -22,6 +22,7 @@ mod printer;
 use printer::pr_str;
 mod env;
 use env::MalEnv;
+use env::MakeRcEnv;
 mod core;
 use core::core_ns; // Also exports err!, mlist! macros.
 
@@ -67,26 +68,6 @@ fn is_true(cond: MalVal) -> bool {
         Nil     => false,
         _       => true
     }
-}
-
-fn make_env(binds: &VecLike, outer_env: &Rc<MalEnv>) -> Result<Rc<MalEnv>, MalErr> {
-    let new_env = MalEnv::make_inner(outer_env);
-
-    if binds.len() % 2 != 0 {
-        return err!("binds for let* wasn't even")
-    }
-
-    for bind in binds.chunks(2) {
-        match &bind[0] {
-            Sym(k) => {
-                let v = ervl!(bind[1], Rc::clone(&new_env))?;
-                new_env.set(k.clone(), v);
-            }
-            _ => return err!("bind in let* wasn't a symbol")
-        }
-    }
-
-    Ok(new_env)
 }
 
 fn quasiquote(ast: MalVal) -> MalVal {
@@ -202,7 +183,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, mut env: Rc<MalEnv>) -> MalRet {
                                 let form = &rest[1];
                                 match binds {
                                     List(bl) | Vector(bl) => {
-                                        env = make_env(bl, &env)?;
+                                        env = env.for_let(bl, EVAL)?;
                                         ast = Rc::new(form.clone());
                                         continue 'eval_loop
                                     }
@@ -276,7 +257,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, mut env: Rc<MalEnv>) -> MalRet {
                                                 (Sym(s), Sym(_)) if s == "catch*" => {
                                                     // Only expect a single bind to the single error.
                                                     let bindlist  = VecLike::new(vec![bind.clone()], Nil);
-                                                    let catch_env = MalEnv::make_bound_env(&env, &Box::new(bindlist), &[err.to_val()])?;
+                                                    let catch_env = env.bound_to(&Box::new(bindlist), &[err.to_val()])?;
                                                     EVAL(Rc::new(body.clone()), catch_env)
                                                 }
                                                 (_, err) => errf!("Expected catch*, got {}", v_to_str!(err))
@@ -298,7 +279,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, mut env: Rc<MalEnv>) -> MalRet {
                             CoreFun(f) => return f.call(args),
                             UserFun(f) => {
                                 ast = Rc::clone(&f.body);
-                                env = MalEnv::make_bound_env(&f.env, &f.binds, args)?;
+                                env = f.env.bound_to(&f.binds, args)?;
                                 continue 'eval_loop
                             }
                             _ => return errf!("can't treat this as a function: {}", v_to_str!(fun))
@@ -340,7 +321,7 @@ fn rep_lit(code: &str, env: &Rc<MalEnv>) {
 }
 
 fn main() {
-    let repl_env = MalEnv::make_root();
+    let repl_env = MalEnv::new_root();
 
     repl_env.set("*host-language*".to_string(), Str("rust".to_string()));
 
