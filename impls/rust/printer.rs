@@ -2,7 +2,7 @@ use types::MalVal::{self, *};
 use reader::{KW_PREFIX};
 use regex::{Regex, Captures};
 
-fn malstr_as_string(s: String, print_readably: bool) -> String {
+pub fn malstr_as_string(s: String, print_readably: bool) -> String {
     if s.starts_with(KW_PREFIX) {
         // ʞ => : where ʞ is two bytes wide.
         format!(":{}", &s[2 .. s.len()])

@@ -4,7 +4,6 @@ use std::env::args;
 use std::io::{self, Write};
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::cell::RefCell;
 
 extern crate regex;
 
@@ -25,20 +24,19 @@ mod env;
 use env::MalEnv;
 mod core;
 use core::core_ns; // Also exports err!, mlist! macros.
-use core::call_fun;
 
 // Simplify common EVAL use case where the first arg is cloned into a new Rc.
 macro_rules! ervl {
     ($val:expr, $env:expr) => { EVAL(Rc::new($val.clone()), $env) }
 }
 
-fn eval_ast(ast: Rc<MalVal>, menv: &Rc<MalEnv>) -> MalRet {
+fn eval_ast(ast: Rc<MalVal>, env: Rc<MalEnv>) -> MalRet {
     match &*ast {
         List(l) => {
             let mut new_list: Vec<MalVal> = Vec::new();
             // Iterate with for-loop to raise the first Err encountered.
             for v in l.iter() {
-                new_list.push(ervl!(v, menv)?);
+                new_list.push(ervl!(v, Rc::clone(&env))?);
             }
             Ok(as_mal_list!(new_list))
         },
@@ -46,7 +44,7 @@ fn eval_ast(ast: Rc<MalVal>, menv: &Rc<MalEnv>) -> MalRet {
             let mut new_vec: Vec<MalVal> = Vec::new();
             // Iterate with for-loop to raise the first Err encountered.
             for v in l.iter() {
-                new_vec.push(ervl!(v, menv)?);
+                new_vec.push(ervl!(v, Rc::clone(&env))?);
             }
             Ok(VecLike::as_vec(new_vec))
         },
@@ -54,11 +52,11 @@ fn eval_ast(ast: Rc<MalVal>, menv: &Rc<MalEnv>) -> MalRet {
             let mut new_map: HashMap<String, MalVal> = HashMap::new();
             // Iterate with for-loop to raise the first Err encountered.
             for (k, v) in m.iter() {
-                new_map.insert(k.clone(), ervl!(v, menv)?);
+                new_map.insert(k.clone(), ervl!(v, Rc::clone(&env))?);
             }
             Ok(mal_map![new_map])
         },
-        Sym(s) => menv.get(&s),
+        Sym(s) => env.get(&s),
         v => Ok(v.clone())
     }
 }
@@ -81,7 +79,7 @@ fn make_env(binds: &VecLike, outer_env: &Rc<MalEnv>) -> Result<Rc<MalEnv>, MalEr
     for bind in binds.chunks(2) {
         match &bind[0] {
             Sym(k) => {
-                let v = ervl!(bind[1], &new_env)?;
+                let v = ervl!(bind[1], Rc::clone(&new_env))?;
                 new_env.set(k.clone(), v);
             }
             _ => return err!("bind in let* wasn't a symbol")
@@ -152,11 +150,9 @@ fn macroexpand(mut ast: Rc<MalVal>, env: &Rc<MalEnv>) -> Result<Rc<MalVal>, MalE
 }
 
 #[allow(non_snake_case)]
-pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
-    let env = RefCell::new(Rc::clone(cur_env));
-
+pub fn EVAL(mut ast: Rc<MalVal>, mut env: Rc<MalEnv>) -> MalRet {
     'eval_loop: loop {
-        ast = macroexpand(ast, &env.borrow())?;
+        ast = macroexpand(ast, &env)?;
 
         match &*ast {
             List(l) => {
@@ -171,8 +167,8 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                 let (name, args) = rest.split_first().unwrap();
                                 return match name {
                                     Sym(s) => {
-                                        let val = ervl!(args[0], &env.borrow())?;
-                                        env.borrow().set(s.clone(), val.clone());
+                                        let val = ervl!(args[0], Rc::clone(&env))?;
+                                        env.set(s.clone(), val.clone());
                                         Ok(val)
                                     },
                                     _ => err!("First elem of def! wasn't a Sym")
@@ -182,11 +178,11 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                 let (name, args) = rest.split_first().unwrap();
                                 return match name {
                                     Sym(s) => {
-                                        let val = ervl!(args[0], &env.borrow())?;
+                                        let val = ervl!(args[0], Rc::clone(&env))?;
                                         if let UserFun(f) = val {
                                             let mut mac = f.clone();
                                             mac.is_macro = true;
-                                            env.borrow().set(s.clone(), UserFun(mac));
+                                            env.set(s.clone(), UserFun(mac));
                                             Ok(Nil) // Not correct, should return val.
                                         }
                                         else {
@@ -197,7 +193,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                 }
                             }
                             "macroexpand" => {
-                                let astrc  = macroexpand(Rc::new(rest[0].clone()), &env.borrow())?;
+                                let astrc  = macroexpand(Rc::new(rest[0].clone()), &env)?;
                                 let newast = Rc::try_unwrap(astrc); // Result<MalVal, Rc<MalVal>>
                                 return newast.map_err(|_| MalErr(Rc::new(Str("couldn't get at result of macroexpand?!".to_string()))));
                             }
@@ -206,8 +202,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                 let form = &rest[1];
                                 match binds {
                                     List(bl) | Vector(bl) => {
-                                        let new_env = make_env(bl, &env.borrow())?;
-                                        env.replace(new_env);
+                                        env = make_env(bl, &env)?;
                                         ast = Rc::new(form.clone());
                                         continue 'eval_loop
                                     }
@@ -216,13 +211,13 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                             }
                             "do" => {
                                 let(last, leading) = rest.split_last().unwrap();
-                                eval_ast(Rc::new(as_mal_list![leading.to_vec()]), &env.borrow())?;
+                                eval_ast(Rc::new(as_mal_list![leading.to_vec()]), Rc::clone(&env))?;
                                 ast = Rc::new(last.clone());
                                 continue 'eval_loop
                             }
                             "if" => {
                                 // rest[0] = cond, rest[1] = true branch, rest[2] = false branch
-                                let next_ast = if is_true(ervl!(rest[0], &env.borrow())?) {
+                                let next_ast = if is_true(ervl!(rest[0], Rc::clone(&env))?) {
                                     &rest[1]
                                 }
                                 else if rest.len() > 2 {
@@ -243,7 +238,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                             MalUserFn::as_fun(
                                                 bl.clone(),
                                                 body.clone(),
-                                                Rc::clone(&env.borrow()),
+                                                Rc::clone(&env),
                                                 false,
                                                 // Allow calling user functions in core.
                                                 EVAL
@@ -256,9 +251,9 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                             }
                             "eval" => {
                                 // Get the ast to run EVAL against.
-                                let tmp_ast = ervl!(rest[0], &env.borrow())?;
+                                let tmp_ast = ervl!(rest[0], Rc::clone(&env))?;
                                 // Evaluate the produced AST.
-                                return EVAL(Rc::new(tmp_ast), &env.borrow().root());
+                                return EVAL(Rc::new(tmp_ast), env.root());
                             }
                             "quote" => {
                                 return Ok(rest[0].clone());
@@ -268,7 +263,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                 continue 'eval_loop
                             }
                             "try*" => {
-                                return match ervl!(rest[0], &env.borrow()) {
+                                return match ervl!(rest[0], Rc::clone(&env)) {
                                     Ok(res) => Ok(res),
                                     Err(err) => {
                                         if rest.len() == 1 {
@@ -281,10 +276,10 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                                                 (Sym(s), Sym(_)) if s == "catch*" => {
                                                     // Only expect a single bind to the single error.
                                                     let bindlist  = VecLike::new(vec![bind.clone()], Nil);
-                                                    let catch_env = MalEnv::make_bound_env(&env.borrow(), &Box::new(bindlist), &[err.to_val()])?;
-                                                    EVAL(Rc::new(body.clone()), &catch_env)
+                                                    let catch_env = MalEnv::make_bound_env(&env, &Box::new(bindlist), &[err.to_val()])?;
+                                                    EVAL(Rc::new(body.clone()), catch_env)
                                                 }
-                                                (_, err) => errf!("Expected catch*, got {}", pr_str(err.clone(), true))
+                                                (_, err) => errf!("Expected catch*, got {}", v_to_str!(err))
                                             }
                                         }
                                         else {
@@ -297,16 +292,24 @@ pub fn EVAL(mut ast: Rc<MalVal>, cur_env: &Rc<MalEnv>) -> MalRet {
                         }
                     }
 
-                    return if let List(fcall) = eval_ast(ast, &env.borrow())? {
+                    return if let List(fcall) = eval_ast(ast, Rc::clone(&env))? {
                         let (fun, args) = fcall.split_first();
-                        call_fun(&fun, args)
+                        match &fun {
+                            CoreFun(f) => return f.call(args),
+                            UserFun(f) => {
+                                ast = Rc::clone(&f.body);
+                                env = MalEnv::make_bound_env(&f.env, &f.binds, args)?;
+                                continue 'eval_loop
+                            }
+                            _ => return errf!("can't treat this as a function: {}", v_to_str!(fun))
+                        }
                     }
                     else {
                         err!("Somehow eval_ast(List) didn't return a list?")
                     }
                 }
             }
-            v => return eval_ast(Rc::new(v.clone()), &env.borrow())
+            v => return eval_ast(Rc::new(v.clone()), Rc::clone(&env))
         }
     }
 }
@@ -323,14 +326,14 @@ fn READ(code: String) -> Result<MalVal, String> {
 
 fn rep(code: String, menv: &Rc<MalEnv>) -> Result<String, String> {
     let ast = READ(code)?;
-    match EVAL(Rc::new(ast), menv) {
+    match EVAL(Rc::new(ast), Rc::clone(menv)) {
         Ok(res) => Ok(PRINT(res)),
         Err(err) => Err(format!("Error encountered: {}", pr_str(err.to_val(), true))),
     }
 }
 
 fn rep_lit(code: &str, env: &Rc<MalEnv>) {
-    if let Err(e) = rep(code.to_string(), env) {
+    if let Err(e) = rep(code.to_string(), &Rc::clone(env)) {
        println!("Failed to eval '{}': {}", code, e);
        std::process::exit(1);
    }
