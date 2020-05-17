@@ -8,16 +8,19 @@ use types::MalErr;
 use types::MalRet;
 use types::VecLike;
 
+use printer::pr_str;
+use printer::malstr_as_string;
+
 use ::as_mal_list;
 use ::as_mal_err;
 use ::errf;
 use ::err;
+use ::v_to_str;
 
 #[derive(Clone)]
 pub struct MalEnv {
     outer: Option<Rc<MalEnv>>,
     data:  Rc<RefCell<HashMap<String, MalVal>>>,
-//    pub id:    i32
 }
 
 impl MalEnv {
@@ -109,3 +112,11 @@ impl MalEnv {
     }
 }
 
+impl ToString for MalEnv {
+    fn to_string(&self) -> String {
+        format!("{{\n{}}}", self.data.borrow().iter()
+                .filter(|(_,v)| !matches!(v, CoreFun(_)))
+                .map(|(k,v)| format!("  {} {}\n", malstr_as_string(k.clone(), true), v_to_str!(v)))
+                .collect::<Vec<String>>().join(" "))
+    }
+}

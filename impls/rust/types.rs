@@ -20,7 +20,7 @@ pub type MalRet   = Result<MalVal, MalErr>;
 pub type MalFnSig = fn(&[MalVal]) -> MalRet;
 
 // Probably gross way of exposing EVAL into core.
-type EvalSig = fn(Rc<MalVal>, &Rc<MalEnv>) -> MalRet;
+type EvalSig = fn(Rc<MalVal>, Rc<MalEnv>) -> MalRet;
 
 #[derive(Clone)]
 pub struct MalCoreFn {
@@ -78,7 +78,7 @@ impl MalCallable for MalCoreFn {
 impl MalCallable for MalUserFn {
     fn call(&self, args: &[MalVal]) -> MalRet {
         let inner_env = MalEnv::make_bound_env(&self.env, &self.binds, args)?;
-        Ok((self.eval)(Rc::clone(&self.body), &inner_env)?)
+        Ok((self.eval)(Rc::clone(&self.body), inner_env)?)
     }
 }
 
