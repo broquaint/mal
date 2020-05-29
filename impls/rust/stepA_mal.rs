@@ -71,7 +71,7 @@ fn is_true(cond: MalVal) -> bool {
 }
 
 fn quasiquote(ast: MalVal) -> MalVal {
-    match ast {
+    match &ast {
         List(l) | Vector(l) if !l.is_empty() => {
             let(head, tail) = l.split_first();
             match head {
@@ -102,9 +102,9 @@ fn is_macro_call(ast: Rc<MalVal>, env: &Rc<MalEnv>) -> Option<MalUserFn> {
                 let e = env.find(&s);
                 if e.is_none() { return None }
                 let r = e.unwrap().get(&s);
-                match r {
+                match &r {
                     // Return a MalUserFn here to saving pulling it out again in macroexpand.
-                    Ok(UserFun(f)) if f.is_macro => Some(f),
+                    Ok(UserFun(f)) if f.is_macro => Some(f.clone()),
                     _ => None
                 }
             } else { None }
@@ -160,7 +160,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, mut env: Rc<MalEnv>) -> MalRet {
                                 return match name {
                                     Sym(s) => {
                                         let val = ervl!(args[0], Rc::clone(&env))?;
-                                        if let UserFun(f) = val {
+                                        if let UserFun(ref f) = val {
                                             let mut mac = f.clone();
                                             mac.is_macro = true;
                                             env.set(s.clone(), UserFun(mac));
@@ -198,16 +198,15 @@ pub fn EVAL(mut ast: Rc<MalVal>, mut env: Rc<MalEnv>) -> MalRet {
                             }
                             "if" => {
                                 // rest[0] = cond, rest[1] = true branch, rest[2] = false branch
-                                let next_ast = if is_true(ervl!(rest[0], Rc::clone(&env))?) {
-                                    &rest[1]
+                                ast = Rc::new(if is_true(ervl!(rest[0], Rc::clone(&env))?) {
+                                    rest[1].clone()
                                 }
                                 else if rest.len() > 2 {
-                                    &rest[2]
+                                    rest[2].clone()
                                 }
                                 else {
-                                   &Nil
-                                };
-                                ast = Rc::new(next_ast.clone());
+                                   Nil.clone()
+                                });
                                 continue 'eval_loop
                             }
                             "fn*" => {
@@ -273,7 +272,7 @@ pub fn EVAL(mut ast: Rc<MalVal>, mut env: Rc<MalEnv>) -> MalRet {
                         }
                     }
 
-                    return if let List(fcall) = eval_ast(ast, Rc::clone(&env))? {
+                    return if let List(ref fcall) = eval_ast(ast, Rc::clone(&env))? {
                         let (fun, args) = fcall.split_first();
                         match &fun {
                             CoreFun(f) => return f.call(args),

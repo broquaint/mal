@@ -262,6 +262,12 @@ impl MalVal {
     }
 }
 
+// impl Drop for MalVal {
+//     fn drop(&mut self) {
+//         println!("dropping a val ...")
+//     }
+// }
+
 #[derive(Clone)]
 pub struct MalErr(pub Rc<MalVal>);
 

@@ -24,10 +24,10 @@ pub fn pr_str(val: MalVal, print_readably: bool) -> String {
     let pr     = |v| pr_str(v, print_readably);
     let as_str = |v| malstr_as_string(v, print_readably);
 
-    match val {
+    match &val {
         Int(n) => n.to_string(),
-        Sym(s) => s,
-        Bool(b) => (if b { "true" } else { "false" }).to_string(),
+        Sym(s) => s.clone(),
+        Bool(b) => (if *b { "true" } else { "false" }).to_string(),
         Nil  => "nil".to_string(),
         Str(s) => as_str(s.clone()),
         List(l) => format!("({})", l.iter()
@@ -50,10 +50,10 @@ pub fn rs_pr_str(val: MalVal) -> String {
     let pr     = |v| rs_pr_str(v);
     let as_str = |v| malstr_as_string(v, true);
 
-    match val {
+    match &val {
         Int(n) => format!("Int({})", n.to_string()),
         Sym(s) => format!("Sym({})", s),
-        Bool(b) => format!("Bool({})", (if b { "true" } else { "false" }).to_string()),
+        Bool(b) => format!("Bool({})", (if *b { "true" } else { "false" }).to_string()),
         Nil  => "Nil(nil)".to_string(),
         Str(s) => format!("Str({})", as_str(s.clone())),
         List(l) => format!("List({})", l.iter()
