@@ -11,8 +11,7 @@ main(_) ->
             io:format("Error reading input: ~p~n", [ErrorDescription]),
             exit(ioerr);
         Input ->
-            {Ast, _} = print(eval(read(Input))),
-            io:format("~s~n", [Ast]),
+            io:format("~s~n", [print(eval(read(Input)))]),
             main("")
         end.
 

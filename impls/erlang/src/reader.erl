@@ -10,49 +10,62 @@ tokenize(Code) ->
         {match, Captured} -> 
             Tokens = [lists:sublist(Code, Pos + 1, Len) || [_, {Pos, Len}] <- Captured],
 
-            {success, #{tokens=>Tokens,pos=>1}};
+            {success, Tokens};
         nomatch -> {error, "Failed to match"}
         % As this is a global match and a valid RE we shouldn't encounter these.
         % match | {error, ErrType} -> 
         end.
 
-r_peek(Reader) ->
-    lists:nth(maps:get(pos, Reader), maps:get(tokens, Reader)).
+%% r_peek(Reader) ->
+%%     lists:nth(maps:get(pos, Reader), maps:get(tokens, Reader)).
 
-r_next(Reader) ->
-    CurPos = maps:get(pos, Reader),
-    Token  = lists:nth(CurPos, maps:get(tokens, Reader)),
-    {Token, maps:update(pos, CurPos + 1, Reader)}.
+%% r_next(Reader) ->
+%%     CurPos = maps:get(pos, Reader),
+%%     Token  = lists:nth(CurPos, maps:get(tokens, Reader)),
+%%     {Token, maps:update(pos, CurPos + 1, Reader)}.
 
-%r_before_end(Reader) ->
-%    maps:get(pos, Reader) < length(maps:get(tokens, Reader)).
+% -record(mal_list, {elems}).
+% -record(mal_scalar, {val}).
 
-read_seq(Reader) ->
-    {_, RBegin} = r_next(Reader), % Move past opening paren.
-    read_seq(RBegin, []).
+%% mal_list_append(List, Elem) ->
+%%     mal_list_append(List, [Elem]).
+%% mal_list_append(List, [Elem]) ->
+%%     CurElems = List#mal_list{elems},
+%%     List#mal_list{elems = CurElems ++ Elem}.
 
-read_seq(Reader, List) ->
-    case r_peek(Reader) of
-        ")" -> {_, REnd} = r_next(Reader),
-               {List, REnd};
-        _   -> {Element, RNext} = read_form(Reader),
-               {List ++ [Element], RNext}
+read_seq([]) -> {[],[]};
+read_seq([H|T]) -> read_seq([H|T], []).
+
+read_seq([], List) -> {List, []};
+%read_seq([H|Tail], List) when H == ")" -> {List, Tail};
+read_seq(Tokens, List) ->
+    [H|Tail] = Tokens,
+    case H of
+        ")" -> {List, Tail};
+        _   -> 
+            {Elem, Rest} = read_form(Tokens),
+            read_seq(Rest, List ++ [Elem])
     end.
 
-read_atom(Reader) ->
-    r_next(Reader).
+read_atom([H|Tail]) ->
+    {H, Tail}.
 
-read_form(Reader) ->
+% Everything under read_form should return {List*, Tokens}
+read_form([]) -> [];
+read_form(Tokens) ->
+    [H|Tail] = Tokens,
 %    io:format("now at ~p~n", [r_peek(Reader)]),
-    case r_peek(Reader) of
-        "(" -> read_seq(Reader);
+    case H of
+        "(" -> read_seq(Tail);
         %% "[" => read_vec(r);
         %% "{" => read_map(r);
-        _Else -> read_atom(Reader)
+        _Else -> read_atom(Tokens)
     end.
 
 read_str(Code) ->
     case tokenize(Code) of
-        {success, Reader} -> read_form(Reader);
+        {success, Reader} -> 
+            {Ast, _} = read_form(Reader),
+            Ast;
         {error, Err} -> Err
         end.
