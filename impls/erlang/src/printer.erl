@@ -9,6 +9,9 @@ pr_str(Ast) ->
         is_record(Ast, mal_list) ->
             Elems = [pr_str(E) || E <- Ast#mal_list.elems],
             "(" ++ string:join(Elems, " ") ++ ")";
+        is_record(Ast, mal_vec) ->
+            Elems = [pr_str(E) || E <- Ast#mal_vec.elems],
+            "[" ++ string:join(Elems, " ") ++ "]";
         is_record(Ast, mal_str) ->
             "\x22" ++ Ast#mal_str.val ++ "\x22";
         is_record(Ast, mal_num) ->

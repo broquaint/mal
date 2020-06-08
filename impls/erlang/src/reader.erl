@@ -18,31 +18,30 @@ tokenize(Code) ->
         % match | {error, ErrType} -> 
         end.
 
-%% is_mal_int(Token) ->
-%%     % Just apply to_integer?
-%%     case re:run(Token, "^[0-9]+$") of
-%%         {match, _} -> true;
-%%         _ -> false
-%%     end.
+seq_for(End) ->
+    case End of
+        ")" -> #mal_list{elems=[]};
+        "]" -> #mal_vec{elems=[]}
+    end.
 
-%% mal_list_append(List, Elem) ->
-%%     mal_list_append(List, [Elem]).
-%% mal_list_append(List, [Elem]) ->
-%%     CurElems = List#mal_list{elems},
-%%     List#mal_list{elems = CurElems ++ Elem}.
+add_to_seq(Seq, Elem) ->
+    if is_record(Seq, mal_list) ->
+            Seq#mal_list{elems=Seq#mal_list.elems ++ [Elem]};
+       is_record(Seq, mal_vec) ->
+            Seq#mal_vec{elems=Seq#mal_vec.elems ++ [Elem]}
+    end.
 
-read_seq([]) -> {#mal_list{elems=[]},[]};
-read_seq([H|T]) -> read_seq([H|T], #mal_list{elems=[]}).
+read_seq([], Delim) -> {seq_for(Delim), []};
+read_seq([H|T], Delim) -> read_seq([H|T], seq_for(Delim), Delim).
 
-read_seq([], List) -> {List, []};
-read_seq(Tokens, List) ->
+% XXX Should this be an error case?
+read_seq([], Seq, _) -> {Seq, []};
+read_seq(Tokens, Seq, Delim) ->
     [H|Tail] = Tokens,
     case H of
-        ")" -> {List, Tail};
-        _   -> 
-            {Elem, Rest} = read_form(Tokens),
-            NewList = List#mal_list.elems ++ [Elem],
-            read_seq(Rest, List#mal_list{elems=NewList})
+        Delim -> {Seq, Tail};
+        _ -> {Elem, Rest} = read_form(Tokens),
+             read_seq(Rest, add_to_seq(Seq, Elem), Delim)
     end.
 
 read_atom([Atom|Tail]) ->
@@ -63,8 +62,8 @@ read_form(Tokens) ->
     [H|Tail] = Tokens,
 %    io:format("now at ~p~n", [r_peek(Reader)]),
     case H of
-        "(" -> read_seq(Tail);
-        %% "[" => read_vec(r);
+        "(" -> read_seq(Tail, ")");
+        "[" -> read_seq(Tail, "]");
         %% "{" => read_map(r);
         _Else -> read_atom(Tokens)
     end.
@@ -72,7 +71,6 @@ read_form(Tokens) ->
 read_str(Code) ->
     case tokenize(Code) of
         {success, Reader} -> 
-            {Ast, _} = read_form(Reader),
-            Ast;
+            element(1, read_form(Reader));
         {error, Err} -> Err
         end.
