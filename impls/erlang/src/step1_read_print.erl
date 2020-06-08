@@ -22,6 +22,6 @@ read(Code) ->
 eval(Code) ->
     Code.
 
-print(Code) ->
-    Code.
+print(Ast) ->
+    printer:pr_str(Ast).
 
