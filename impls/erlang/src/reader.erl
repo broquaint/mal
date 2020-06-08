@@ -1,5 +1,7 @@
 -module(reader).
 
+-include("types.hrl").
+
 -export([read_str/1]).
 
 tokenize(Code) ->
@@ -16,16 +18,12 @@ tokenize(Code) ->
         % match | {error, ErrType} -> 
         end.
 
-%% r_peek(Reader) ->
-%%     lists:nth(maps:get(pos, Reader), maps:get(tokens, Reader)).
-
-%% r_next(Reader) ->
-%%     CurPos = maps:get(pos, Reader),
-%%     Token  = lists:nth(CurPos, maps:get(tokens, Reader)),
-%%     {Token, maps:update(pos, CurPos + 1, Reader)}.
-
-% -record(mal_list, {elems}).
-% -record(mal_scalar, {val}).
+%% is_mal_int(Token) ->
+%%     % Just apply to_integer?
+%%     case re:run(Token, "^[0-9]+$") of
+%%         {match, _} -> true;
+%%         _ -> false
+%%     end.
 
 %% mal_list_append(List, Elem) ->
 %%     mal_list_append(List, [Elem]).
@@ -33,22 +31,31 @@ tokenize(Code) ->
 %%     CurElems = List#mal_list{elems},
 %%     List#mal_list{elems = CurElems ++ Elem}.
 
-read_seq([]) -> {[],[]};
-read_seq([H|T]) -> read_seq([H|T], []).
+read_seq([]) -> {#mal_list{elems=[]},[]};
+read_seq([H|T]) -> read_seq([H|T], #mal_list{elems=[]}).
 
 read_seq([], List) -> {List, []};
-%read_seq([H|Tail], List) when H == ")" -> {List, Tail};
 read_seq(Tokens, List) ->
     [H|Tail] = Tokens,
     case H of
         ")" -> {List, Tail};
         _   -> 
             {Elem, Rest} = read_form(Tokens),
-            read_seq(Rest, List ++ [Elem])
+            NewList = List#mal_list.elems ++ [Elem],
+            read_seq(Rest, List#mal_list{elems=NewList})
     end.
 
-read_atom([H|Tail]) ->
-    {H, Tail}.
+read_atom([Atom|Tail]) ->
+    [C1|_] = Atom,
+    Val = if C1 =:= $" ->
+                  #mal_str{val=lists:sublist(Atom, 2, length(Atom) - 2)};
+             C1 >= $0, C1 =< $9 -> % Hopefully useful Heuristic,
+                  {Num,_} = string:to_integer(Atom),
+                  #mal_num{val=Num};
+             true ->
+                  #mal_sym{val=Atom}
+          end,
+    {Val, Tail}.
 
 % Everything under read_form should return {List*, Tokens}
 read_form([]) -> [];
