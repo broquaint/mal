@@ -12,6 +12,10 @@ pr_str(Ast) ->
         is_record(Ast, mal_vec) ->
             Elems = [pr_str(E) || E <- Ast#mal_vec.elems],
             "[" ++ string:join(Elems, " ") ++ "]";
+        is_record(Ast, mal_map) ->
+            Pairs = maps:to_list(Ast#mal_map.pairs),
+            Elems = [pr_str(K) ++ " " ++ pr_str(V) || {K,V} <- Pairs],
+            "{" ++ string:join(Elems, " ") ++ "}";
         is_record(Ast, mal_str) ->
             "\x22" ++ Ast#mal_str.val ++ "\x22";
         is_record(Ast, mal_num) ->

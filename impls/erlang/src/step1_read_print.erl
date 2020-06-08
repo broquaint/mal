@@ -2,7 +2,9 @@
 
 -export([main/1]).
 
-main(_) ->
+main(_) -> repl().
+
+repl() ->
     case io:get_line(standard_io, "user> ") of
         eof ->
             io:format("~n"),
@@ -11,8 +13,12 @@ main(_) ->
             io:format("Error reading input: ~p~n", [ErrorDescription]),
             exit(ioerr);
         Input ->
-            io:format("~s~n", [print(eval(read(Input)))]),
-            main("")
+            case read(Input) of
+                {success, Ast} ->
+                    io:format("~s~n", [print(eval(Ast))]);
+                {error, Err} -> io:format("Error: ~s~n", [Err])
+            end,
+            repl()
         end.
 
 read(Code) ->
