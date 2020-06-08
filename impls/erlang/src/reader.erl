@@ -21,7 +21,8 @@ tokenize(Code) ->
 seq_for(End) ->
     case End of
         ")" -> #mal_list{elems=[]};
-        "]" -> #mal_vec{elems=[]}
+        "]" -> #mal_vec{elems=[]};
+        "}" -> #mal_list{elems=[]} % Used to build up pairs
     end.
 
 add_to_seq(Seq, Elem) ->
@@ -34,8 +35,7 @@ add_to_seq(Seq, Elem) ->
 read_seq([], Delim) -> {seq_for(Delim), []};
 read_seq([H|T], Delim) -> read_seq([H|T], seq_for(Delim), Delim).
 
-% XXX Should this be an error case?
-read_seq([], Seq, _) -> {Seq, []};
+read_seq([], _, Delim) -> throw(unbalanced_seq);
 read_seq(Tokens, Seq, Delim) ->
     [H|Tail] = Tokens,
     case H of
@@ -43,6 +43,21 @@ read_seq(Tokens, Seq, Delim) ->
         _ -> {Elem, Rest} = read_form(Tokens),
              read_seq(Rest, add_to_seq(Seq, Elem), Delim)
     end.
+
+read_map(Tokens) ->
+    {Ast, Tail} = read_seq(Tokens, "}"),
+    if length(Ast#mal_list.elems) rem 2 == 0 ->
+            {make_map(#mal_map{pairs=#{}}, Ast#mal_list.elems), Tail};
+       true -> throw(uneven_map)
+    end.
+
+add_to_map(K, V, Map) ->
+    NewMap = maps:put(K, V, Map#mal_map.pairs),
+    Map#mal_map{pairs=NewMap}.
+
+make_map(Map, []) -> Map;
+make_map(Map, [K,V|Rest]) ->
+    make_map(add_to_map(K, V, Map), Rest).
 
 read_atom([Atom|Tail]) ->
     [C1|_] = Atom,
@@ -64,13 +79,17 @@ read_form(Tokens) ->
     case H of
         "(" -> read_seq(Tail, ")");
         "[" -> read_seq(Tail, "]");
-        %% "{" => read_map(r);
+        "{" -> read_map(Tail);
         _Else -> read_atom(Tokens)
     end.
 
 read_str(Code) ->
     case tokenize(Code) of
-        {success, Reader} -> 
-            element(1, read_form(Reader));
-        {error, Err} -> Err
+        {success, Reader} ->
+            case catch read_form(Reader) of
+                {Ast, _} -> {success, Ast};
+                unbalanced_seq -> {error, "end of input"};
+                uneven_map -> {error, "uneven pairs in map"}
+                end;
+        {error, Err} -> {error, Err}
         end.
