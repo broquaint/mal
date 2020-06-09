@@ -20,6 +20,8 @@ pr_str(Ast) ->
             "\x22" ++ Ast#mal_str.val ++ "\x22";
         is_record(Ast, mal_num) ->
             integer_to_list(Ast#mal_num.val);
+        is_record(Ast, mal_kwd) ->
+            ":" ++ Ast#mal_kwd.val;
         is_record(Ast, mal_sym) ->
             Ast#mal_sym.val
     end.
