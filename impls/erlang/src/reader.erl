@@ -35,7 +35,7 @@ add_to_seq(Seq, Elem) ->
 read_seq([], Delim) -> {seq_for(Delim), []};
 read_seq([H|T], Delim) -> read_seq([H|T], seq_for(Delim), Delim).
 
-read_seq([], _, Delim) -> throw(unbalanced_seq);
+read_seq([], _, _) -> throw(unbalanced_seq);
 read_seq(Tokens, Seq, Delim) ->
     [H|Tail] = Tokens,
     case H of
@@ -59,17 +59,23 @@ make_map(Map, []) -> Map;
 make_map(Map, [K,V|Rest]) ->
     make_map(add_to_map(K, V, Map), Rest).
 
+mal_sym(V) -> #mal_sym{val=V}.
+
 read_atom([Atom|Tail]) ->
     [C1|_] = Atom,
     Val = if C1 =:= $" ->
-                  #mal_str{val=lists:sublist(Atom, 2, length(Atom) - 2)};
+                  {#mal_str{val=lists:sublist(Atom, 2, length(Atom) - 2)}, Tail};
              C1 >= $0, C1 =< $9 -> % Hopefully useful Heuristic,
                   {Num,_} = string:to_integer(Atom),
-                  #mal_num{val=Num};
+                  {#mal_num{val=Num}, Tail};
+             C1 =:= $: ->
+                  {#mal_kwd{val=lists:sublist(Atom, 2, length(Atom) - 1)}, Tail};
+             C1 =:= $' ->
+                  {Quoted, Rest} = read_form(Tail),
+                  {#mal_list{elems=[mal_sym("quote"), Quoted]}, Rest};
              true ->
-                  #mal_sym{val=Atom}
-          end,
-    {Val, Tail}.
+                  {mal_sym(Atom), Tail}
+          end.
 
 % Everything under read_form should return {List*, Tokens}
 read_form([]) -> [];

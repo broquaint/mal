@@ -8,4 +8,5 @@
 % XXX Have all scalar types samey?
 -record(mal_num, {val}).
 -record(mal_str, {val}).
+-record(mal_kwd, {val}).
 -record(mal_sym, {val}).
