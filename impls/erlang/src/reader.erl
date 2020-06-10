@@ -18,23 +18,13 @@ tokenize(Code) ->
         % match | {error, ErrType} -> 
         end.
 
-seq_for(End) ->
-    case End of
-        ")" -> #mal_list{elems=[]};
-        "]" -> #mal_vec{elems=[]};
-        "}" -> #mal_list{elems=[]} % Used to build up pairs
-    end.
 mal_sym(V) -> #mal_sym{val=V}.
 
-add_to_seq(Seq, Elem) ->
-    if is_record(Seq, mal_list) ->
-            Seq#mal_list{elems=Seq#mal_list.elems ++ [Elem]};
-       is_record(Seq, mal_vec) ->
-            Seq#mal_vec{elems=Seq#mal_vec.elems ++ [Elem]}
-    end.
+% mal_list(E) -> mal_list([E]);
+mal_list(E) -> #mal_list{elems=E}.
 
-read_seq([], Delim) -> {seq_for(Delim), []};
-read_seq([H|T], Delim) -> read_seq([H|T], seq_for(Delim), Delim).
+read_seq([], _) -> {[], []};
+read_seq([H|T], Delim) -> read_seq([H|T], [], Delim).
 
 read_seq([], _, _) -> throw(unbalanced_seq);
 read_seq(Tokens, Seq, Delim) ->
@@ -42,23 +32,18 @@ read_seq(Tokens, Seq, Delim) ->
     case H of
         Delim -> {Seq, Tail};
         _ -> {Elem, Rest} = read_form(Tokens),
-             read_seq(Rest, add_to_seq(Seq, Elem), Delim)
+             read_seq(Rest, Seq ++ [Elem], Delim)
     end.
 
-read_map(Tokens) ->
-    {Ast, Tail} = read_seq(Tokens, "}"),
-    if length(Ast#mal_list.elems) rem 2 == 0 ->
-            {make_map(#mal_map{pairs=#{}}, Ast#mal_list.elems), Tail};
-       true -> throw(uneven_map)
+read_map({Ast, Tail}) ->
+    if
+        length(Ast) rem 2 =/= 0 -> throw(uneven_map);
+        true -> {#mal_map{pairs=make_map(#{}, Ast)}, Tail}
     end.
-
-add_to_map(K, V, Map) ->
-    NewMap = maps:put(K, V, Map#mal_map.pairs),
-    Map#mal_map{pairs=NewMap}.
 
 make_map(Map, []) -> Map;
 make_map(Map, [K,V|Rest]) ->
-    make_map(add_to_map(K, V, Map), Rest).
+    make_map(maps:put(K, V, Map), Rest).
 
 read_atom([Token|Tail]) ->
     [C1|_] = Token,
@@ -99,9 +84,11 @@ read_form(Tokens) ->
     [H|Tail] = Tokens,
 %    io:format("now at ~p~n", [r_peek(Reader)]),
     case H of
-        "(" -> read_seq(Tail, ")");
-        "[" -> read_seq(Tail, "]");
-        "{" -> read_map(Tail);
+        "(" -> {List, Rest} = read_seq(Tail, ")"),
+                   {mal_list(List), Rest};
+        "[" -> {Vec, Rest} = read_seq(Tail, "]"),
+               {#mal_vec{elems=Vec}, Rest};
+        "{" -> read_map(read_seq(Tail, "}"));
         _Else -> read_atom(Tokens)
     end.
 
