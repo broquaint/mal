@@ -30,7 +30,8 @@ private fun is_equal(a: MalType, b: MalType): Boolean =
         false
     }
 
-// In the case of equal length lists, each element of the list should be compared for equality and if they are the same return true, otherwise false.
+// In the case of equal length lists, each element of the list should be compared for equality and
+// if they are the same return true, otherwise false.
 private fun compare_lists(a: MalSeq, b: MalSeq): Boolean =
     a.atoms.count() == b.atoms.count() &&
     a.atoms.indices.all { is_equal(a[it], b[it]) }
@@ -55,20 +56,24 @@ object core {
         malSym("*") to malFun("times") { int_ops_reducer(Int::times, it) },
         malSym("/") to malFun("div")   { int_ops_reducer(Int::div,   it) },
 
-        // pr-str: calls `pr_str` on each argument with `print_readably` set to true, joins the results with " " and returns the new string.
+        // pr-str: calls `pr_str` on each argument with `print_readably` set to true, joins the
+        // results with " " and returns the new string.
         to_fun("pr-str") {
             MalString(pr_str_core(it))
         },
-        // `str`: calls `pr_str` on each argument with `print_readably` set to false, concatenates the results together ("" separator), and returns the new string.
+        // `str`: calls `pr_str` on each argument with `print_readably` set to false, concatenates
+        // the results together ("" separator), and returns the new string.
         to_fun("str") {
             MalString(str_core(it, joiner = ""))
         },
-        // prn:  calls `pr_str` on each argument with `print_readably` set to true, joins the results with " ", prints the string to the screen and then returns `nil`.
+        // prn: calls `pr_str` on each argument with `print_readably` set to true, joins the results
+        // with " ", prints the string to the screen and then returns `nil`.
         to_fun("prn") {
             println(pr_str_core(it))
             MalNil()
         },
-        // `println`:  calls `pr_str` on each argument with `print_readably` set to false, joins the results with " ", prints the string to the screen and then returns `nil`.
+        // `println`: calls `pr_str` on each argument with `print_readably` set to false, joins the
+        // results with " ", prints the string to the screen and then returns `nil`.
         to_fun("println") {
             println(str_core(it, joiner = " "))
             MalNil()
@@ -78,7 +83,8 @@ object core {
         to_fun("list") { it }, // we always get a list at this point
         // list?: return true if the first parameter is a list, false otherwise.
         to_fun("list?") { MalBoolean(it[0] is MalList) },
-        // empty?: treat the first parameter as a list and return true if the list is empty and false if it contains any elements.
+        // empty?: treat the first parameter as a list and return true if the list is empty and
+        // false if it contains any elements.
         to_fun("empty?") { MalBoolean(it[0] is MalSeq && (it[0] as MalSeq).atoms.isEmpty()) },
         // count: treat the first parameter as a list and return the number of elements that it contains.
         to_fun("count") {
@@ -92,7 +98,8 @@ object core {
             val b = it[1]
             MalBoolean(is_equal(a, b))
         },
-        // <, <=, >, and >=: treat the first two parameters as numbers and do the corresponding numeric comparison, returning either true or false.
+        // <, <=, >, and >=: treat the first two parameters as numbers and do the corresponding
+        // numeric comparison, returning either true or false.
         malSym("<") to malFun("lt") {
             val a = it[0] as MalNumber
             val b = it[1] as MalNumber
@@ -162,7 +169,10 @@ object core {
                 else         -> MalVector(seq.atoms + rest)
             }
         },
-        // takes a list, vector, string, or nil. If an empty list, empty vector, or empty string ("") is passed in then nil is returned. Otherwise, a list is returned unchanged, a vector is converted into a list, and a string is converted to a list that containing the original string split into single character strings.
+        // takes a list, vector, string, or nil. If an empty list, empty vector, or empty string
+        // ("") is passed in then nil is returned. Otherwise, a list is returned unchanged, a vector
+        // is converted into a list, and a string is converted to a list that containing the
+        // original string split into single character strings.
         to_fun("seq") {
             val s = it.head()
             when(s) {
@@ -209,11 +219,10 @@ object core {
         },
 
         to_fun("apply") {
-            // The first argument is a function and the last argument
-            // is list (or vector). The arguments between the function
-            // and the last argument (if there are any) are
-            // concatenated with the final argument to create the
-            // arguments that are used to call the function.
+            // The first argument is a function and the last argument is list (or vector). The
+            // arguments between the function and the last argument (if there are any) are
+            // concatenated with the final argument to create the arguments that are used to call
+            // the function.
             val fn     = it[0]     as MalCallable
             val argSeq = it.last() as MalSeq
             val args   = it.atoms.slice(1 .. (if(it.size > 2) it.size - 2 else 0))

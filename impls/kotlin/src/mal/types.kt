@@ -46,12 +46,10 @@ interface MalSeq : MalMeta, MalType {
 }
 
 data class MalList(override val atoms: List<MalType>, override val meta: MalType = MalNil()) : MalSeq {
-    // XXX Not technically a copy ...
     override fun withMeta(m: MalType) =
         MalList(atoms, m)
 }
 data class MalVector(override val atoms: List<MalType>, override val meta: MalType = MalNil()) : MalSeq {
-    // XXX Not technically a copy ...
     override fun withMeta(m: MalType) =
         MalVector(atoms, m)
 }
@@ -59,7 +57,6 @@ data class MalVector(override val atoms: List<MalType>, override val meta: MalTy
 class MalMap(val pairs: Map<MalKey, MalType>, override val meta: MalType = MalNil()) : MalMeta, MalType {
     operator fun get(k: MalKey): MalType = pairs[k] ?: MalNil()
 
-    // XXX Not technically a copy ...
     override fun withMeta(m: MalType) =
         MalMap(pairs, m)
 }

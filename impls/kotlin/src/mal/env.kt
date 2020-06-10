@@ -1,4 +1,5 @@
-// Define an Env object that is instantiated with a single outer parameter and starts with an empty associative data structure property data.
+// Define an Env object that is instantiated with a single outer parameter and starts with an empty
+// associative data structure property data.
 class Env(val outer: Env? = null,
           val binds: MalSeq = emptyMalList(),
           val exprs: MalSeq = emptyMalList()) {
@@ -6,7 +7,9 @@ class Env(val outer: Env? = null,
     val data : MutableMap<MalSymbol, MalType> = mutableMapOf()
 
     init {
-        // Modify the constructor/initializer for environments, so that if a "&" symbol is encountered in the binds list, the next symbol in the binds list after the "&" is bound to the rest of the exprs list that has not been bound yet.
+        // Modify the constructor/initializer for environments, so that if a "&" symbol is
+        // encountered in the binds list, the next symbol in the binds list after the "&" is bound
+        // to the rest of the exprs list that has not been bound yet.
         var vals = exprs.atoms
         bind_loop@ for(idx in binds.atoms.indices) {
             val bind = binds.atoms[idx] as MalSymbol
@@ -28,11 +31,15 @@ class Env(val outer: Env? = null,
         return value
     }
 
-    // find: takes a symbol key and if the current environment contains that key then return the environment. If no key is found and outer is not nil then call find (recurse) on the outer environment.
+    // find: takes a symbol key and if the current environment contains that key then return the
+    // environment. If no key is found and outer is not nil then call find (recurse) on the outer
+    // environment.
     fun find(sym: MalSymbol): Env? =
         if(data.contains(sym)) this else outer?.find(sym)
 
-    // get: takes a symbol key and uses the find method to locate the environment with the key, then returns the matching value. If no key is found up the outer chain, then throws/raises a "not found" error.
+    // get: takes a symbol key and uses the find method to locate the environment with the key, then
+    // returns the matching value. If no key is found up the outer chain, then throws/raises a "not
+    // found" error.
     fun get(key: MalSymbol): MalType {
         val env = find(key) ?: throw MalUserEx("'${key.sym}' not found")
         return env.data.getValue(key)

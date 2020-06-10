@@ -1,7 +1,6 @@
 // For each match captured within the parenthesis starting at char 6
 // of the regular expression a new token will be created.
 
-// TODO Support escaped double quotes e.g "foo \"bar\" baz" -> """foo "bar" baz"""
 private var tokenizer = Regex("""
 # Matches any number of whitespaces or commas
 [\s,]*
@@ -28,12 +27,9 @@ setOf(RegexOption.COMMENTS, RegexOption.MULTILINE)
 
 private val commas = Regex("""^[\s,]*|[,\s]*$""", RegexOption.MULTILINE)
 
-// This function will take a single string and return an array/list of all the tokens (strings) in it.
+// This function will take a single string and return an array/list of all the tokens
+// (strings) in it.
 fun tokenize(s: String) : List<String> {
-    // For some reason this fails where findAll doesn't.
-    // if (!tokenizer.matches(s)) {
-    //     throw MalCoreEx("Failed tokenizing")
-    // }
     return tokenizer.findAll(s)
             .map    { it.value.replace(commas, "") }
             .filter { it.length > 0 }
@@ -69,35 +65,42 @@ private var readEscapeMap = mapOf(
     "$bs$bs" to bs    // \\ to \
 )
 // Bleurgh, the escapes need escapes as they become interpolated into Regex ;_;
-private var readEscapes = Regex(listOf("$bs$bs$bs$bs", "(?<!$bs$bs)$bs$bs$q", "(?<!$bs$bs)$bs${bs}n").joinToString("|", "(", ")"))
+private var readEscapes = Regex(
+    listOf(
+        "$bs$bs$bs$bs",
+        "(?<!$bs$bs)$bs$bs$q",
+        "(?<!$bs$bs)$bs${bs}n"
+    ).joinToString("|", "(", ")")
+)
 
 private fun make_string(s: String) =
     if (s.last() == '"')
-        MalString(s.dropLast(1).replace(readEscapes) { readEscapeMap.get(it.value) ?: it.value })
+        MalString(
+            s.dropLast(1).replace(readEscapes) {readEscapeMap.get(it.value) ?: it.value}
+        )
     else
         throw MalUserEx("Unexpected end of input, unbalanced quote?")
 
-private fun make_with_meta(r: Reader, n: Int): MalType {
-    val meta = read_form(r, n)
-    val func = read_form(r, n)
+private fun make_with_meta(r: Reader): MalType {
+    val meta = read_form(r)
+    val func = read_form(r)
     return malListOf(malSym("with-meta"), func, meta)
 }
 
-private fun read_atom(r: Reader, n: Int) : MalType {
-    //    println("Reading atom: " + r)
+private fun read_atom(r: Reader) : MalType {
     val t = r.next()
     return when {
         t[0] == '"'  -> make_string(t.substring(1 .. t.lastIndex))
         t[0] == ':'  -> MalKeyword(t.substring(1 .. t.lastIndex))
-        t[0] == '^'  -> make_with_meta(r, n)
+        t[0] == '^'  -> make_with_meta(r)
         is_number(t) -> MalNumber(t.toInt())
         is_bool(t)   -> MalBoolean(t == "true")
         t == "nil"   -> MalNil()
         t == "@"     -> make_atom_deref(r.next())
-        t == "'"     -> malListOf(malSym("quote"), read_form(r, n))
-        t == "`"     -> malListOf(malSym("quasiquote"), read_form(r, n))
-        t == "~"     -> malListOf(malSym("unquote"), read_form(r, n))
-        t == "~@"    -> malListOf(malSym("splice-unquote"), read_form(r, n))
+        t == "'"     -> malListOf(malSym("quote"), read_form(r))
+        t == "`"     -> malListOf(malSym("quasiquote"), read_form(r))
+        t == "~"     -> malListOf(malSym("unquote"), read_form(r))
+        t == "~@"    -> malListOf(malSym("splice-unquote"), read_form(r))
         else         -> MalSymbol(t)
     }
 }
@@ -117,29 +120,17 @@ private fun make_map(pairs: List<MalType>) : MalMap {
 
 fun make_map(pairs: MalSeq) = make_map(pairs.atoms)
 
-private var readLimit = 0
-
-// Safety limit to prevent the REPL never coming back.
-private fun check_limit() {
-    readLimit++
-    if (readLimit > 1024) {
-        throw MalCoreEx("Parser found no end :/")
-    }
-}
-
-// This function will peek at the first token in the Reader object and
-// switch on the first character of that token. If the character is a
-// left paren then read_list is called with the Reader
-// object. Otherwise, read_atom is called with the Reader Object. The
-// return value from read_form is a mal data type.
-fun read_form(r: Reader, n: Int) : MalType {
-//    println("v1> " + " ".repeat(n) + "read_form")
+// This function will peek at the first token in the Reader object and switch on the first character
+// of that token. If the character is a left paren then read_list is called with the Reader
+// object. Otherwise, read_atom is called with the Reader Object. The return value from read_form is
+// a mal data type.
+fun read_form(r: Reader) : MalType {
     try {
         return when(r.peek()) {
-            "("  -> MalList(read_seq(")", r, n + 1))
-            "["  -> MalVector(read_seq("]", r, n + 1))
-            "{"  -> make_map(read_seq("}", r, n + 1))
-            else -> read_atom(r, n + 1)
+            "("  -> MalList(read_seq(")", r))
+            "["  -> MalVector(read_seq("]", r))
+            "{"  -> make_map(read_seq("}", r))
+            else -> read_atom(r)
         }
     }
     catch(e: IndexOutOfBoundsException) {
@@ -147,35 +138,22 @@ fun read_form(r: Reader, n: Int) : MalType {
     }
 }
 
-private fun read_seq(endTok: String, r: Reader, n: Int) : List<MalType> {
+private fun read_seq(endTok: String, r: Reader) : List<MalType> {
     r.next() // Move past the opening paren.
-//    val say = { m: String -> println("v1> " + " ".repeat(n) + m) }
     val list : MutableList<MalType> = mutableListOf()
     while(r.peek() != endTok) {
-//        say("at token: " + r.peek())
-        list.add(read_form(r, n))
-        check_limit()
+        list.add(read_form(r))
     }
+
+    // Move past closing paren if possible.
     if(!r.isLast()) r.next()
-//    say("returning list!")
+
     return list
 }
 
-private fun read_form_safely(r: Reader) : MalType {
-    try {
-        return if(r.tokens.isEmpty()) {
-            emptyMalList()
-        }
-        else {
-            read_form(r, 0)
-        }
-    }
-    finally {
-        readLimit = 0
-    }
-}
+private fun read_form_safely(r: Reader) =
+    if(r.tokens.isEmpty()) { emptyMalList() } else { read_form(r) }
 
-// This function will call tokenize and then create a new Reader
-// object instance with the tokens. Then it will call read_form with
-// the Reader instance.
+// This function will call tokenize and then create a new Reader object instance with the
+// tokens. Then it will call read_form with the Reader instance.
 fun read_str(s: String) = read_form_safely(Reader(tokenize(s)))
