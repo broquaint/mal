@@ -24,6 +24,7 @@ seq_for(End) ->
         "]" -> #mal_vec{elems=[]};
         "}" -> #mal_list{elems=[]} % Used to build up pairs
     end.
+mal_sym(V) -> #mal_sym{val=V}.
 
 add_to_seq(Seq, Elem) ->
     if is_record(Seq, mal_list) ->
@@ -59,23 +60,38 @@ make_map(Map, []) -> Map;
 make_map(Map, [K,V|Rest]) ->
     make_map(add_to_map(K, V, Map), Rest).
 
-mal_sym(V) -> #mal_sym{val=V}.
-
-read_atom([Atom|Tail]) ->
-    [C1|_] = Atom,
-    Val = if C1 =:= $" ->
-                  {#mal_str{val=lists:sublist(Atom, 2, length(Atom) - 2)}, Tail};
-             C1 >= $0, C1 =< $9 -> % Hopefully useful Heuristic,
-                  {Num,_} = string:to_integer(Atom),
-                  {#mal_num{val=Num}, Tail};
-             C1 =:= $: ->
-                  {#mal_kwd{val=lists:sublist(Atom, 2, length(Atom) - 1)}, Tail};
-             C1 =:= $' ->
-                  {Quoted, Rest} = read_form(Tail),
-                  {#mal_list{elems=[mal_sym("quote"), Quoted]}, Rest};
-             true ->
-                  {mal_sym(Atom), Tail}
-          end.
+read_atom([Token|Tail]) ->
+    [C1|_] = Token,
+    ReaderMacro = fun(Sym) ->
+                          {Quoted, Rest} = read_form(Tail),
+                          {mal_list([mal_sym(Sym), Quoted]), Rest}
+                  end,
+    Atom = fun(A) -> {A, Tail} end,
+    if C1 =:= $" ->
+            Atom(#mal_str{val=lists:sublist(Token, 2, length(Token) - 2)});
+       C1 >= $0, C1 =< $9 -> % Hopefully useful Heuristic,
+            {Num,_} = string:to_integer(Token),
+            Atom(#mal_num{val=Num});
+       C1 =:= $: ->
+            Atom(#mal_kwd{val=lists:sublist(Token, 2, length(Token) - 1)});
+       C1 =:= $' ->
+            ReaderMacro("quote");
+       C1 =:= $` ->
+            ReaderMacro("quasiquote");
+       Token == "~@" ->
+            ReaderMacro("splice-unquote");
+       C1 =:= $~ ->
+            ReaderMacro("unquote");
+       C1 =:= $@ ->
+            [AtomName|Rest] = Tail,
+            {mal_list([mal_sym("deref"), mal_sym(AtomName)]), Rest};
+       C1 =:= $^ ->
+            {Meta, R1} = read_form(Tail),
+            {Val, Rest} = read_form(R1),
+            {mal_list([mal_sym("with-meta"), Val, Meta]), Rest};
+       true ->
+            Atom(mal_sym(Token))
+    end.
 
 % Everything under read_form should return {List*, Tokens}
 read_form([]) -> [];
