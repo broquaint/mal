@@ -8,23 +8,20 @@
 
 interface MalType
 
-interface MalAtom : MalType
+data class MalNumber(val num: Int) : MalType
 
-data class MalNumber(val num: Int) : MalAtom
+data class MalSymbol(val sym: String) : MalType
 
-data class MalSymbol(val sym: String) : MalAtom
-
-data class MalBoolean(val bool: Boolean) : MalAtom
+data class MalBoolean(val bool: Boolean) : MalType
 
 interface MalKey : MalType
 
 data class MalString(val str: String) : MalKey
 data class MalKeyword(val kw: String) : MalKey
 
-// Would use MalAtom but that's already a thing :/
-data class MalCljAtom(var value : MalType) : MalType
+data class MalAtom(var value : MalType) : MalType
 
-class MalNil : MalAtom
+class MalNil : MalType
 
 interface MalMeta {
     val meta: MalType

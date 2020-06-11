@@ -33,7 +33,7 @@ fun pr_str(v: MalType, print_readably: Boolean = true) : String {
         is MalString   -> if(print_readably) malstr_as_string(v.str) else v.str
         is MalSymbol   -> v.sym
         is MalBoolean  -> v.bool.toString()
-        is MalCljAtom  -> "(atom ${pr(v.value)})"
+        is MalAtom     -> "(atom ${pr(v.value)})"
         is MalNil      -> "nil"
         is MalCallable -> "#<${v.name}>"
         is MalUserEx   -> "Exception raised: ${pr(v.src)}"

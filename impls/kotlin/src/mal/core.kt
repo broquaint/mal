@@ -130,21 +130,21 @@ object core {
         },
 
         to_fun("atom") {
-            MalCljAtom(it[0])
+            MalAtom(it[0])
         },
         to_fun("atom?") {
-            MalBoolean(it[0] is MalCljAtom)
+            MalBoolean(it[0] is MalAtom)
         },
         to_fun("deref") {
-            (it[0] as MalCljAtom).value
+            (it[0] as MalAtom).value
         },
         to_fun("reset!") {
-            val a = it[0] as MalCljAtom
+            val a = it[0] as MalAtom
             a.value = it[1]
             a.value
         },
         to_fun("swap!") {
-            val atom = it[0] as MalCljAtom
+            val atom = it[0] as MalAtom
             val fn   = it[1] as MalCallable
             // Pull out args if there are any.
             val args = it.atoms.slice(2 .. (if(it.size > 2) it.size - 1 else 1))
