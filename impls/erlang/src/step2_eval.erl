@@ -56,10 +56,19 @@ eval(Ast, Env) ->
 eval_list_elem(Ast, {List, Env}) ->
     {Res, NextEnv} = eval(Ast, Env),
     {List ++ [Res], NextEnv}.
+eval_map_elem(K, Ast, {Pairs, Env}) ->
+    {Res, NextEnv} = eval(Ast, Env),
+    {maps:put(K, Res, Pairs), NextEnv}.
 
 eval_ast(Ast, Env) when is_record(Ast, mal_list) ->
     {E, NextEnv} = lists:foldl(fun eval_list_elem/2, {[], Env}, Ast#mal_list.elems),
     {#mal_list{elems=E}, NextEnv};
+eval_ast(Ast, Env) when is_record(Ast, mal_vec) ->
+    {E, NextEnv} = lists:foldl(fun eval_list_elem/2, {[], Env}, Ast#mal_vec.elems),
+    {#mal_vec{elems=E}, NextEnv};
+eval_ast(Ast, Env) when is_record(Ast, mal_map) ->
+    {P, NextEnv} = maps:fold(fun eval_map_elem/3, {#{}, Env}, Ast#mal_map.pairs),
+    {#mal_map{pairs=P}, NextEnv};
 eval_ast(Ast, Env) when is_record(Ast, mal_sym) ->
     try map_get(Ast#mal_sym.val, Env) of V -> {V, Env}
     catch
