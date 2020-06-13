@@ -26,11 +26,17 @@ repl(Env) ->
         Input ->
             case read(Input) of
                 {success, Ast} ->
-                    {Res, NextEnv} = eval(Ast, Env),
-                    io:format("~s~n", [print(Res)]),
-                    repl(NextEnv);
+                    try eval(Ast, Env)
+                             of {Res, NextEnv} -> io:format("~s~n", [print(Res)]),
+                                                  repl(NextEnv)
+                    catch
+                        _:{malerr, Err} -> io:format("Exception: ~s~n", [Err]),
+                                         repl(Env);
+                        _:Reason -> io:format("Runtime error: ~p~n", [Reason]),
+                                        repl(Env)
+                    end;
                 {error, Err} ->
-                    io:format("Error: ~s~n", [Err]),
+                    io:format("Reader error: ~s~n", [Err]),
                     repl(Env)
             end
         end.
@@ -55,5 +61,9 @@ eval_list_elem(Ast, {List, Env}) ->
 eval_ast(Ast, Env) when is_record(Ast, mal_list) ->
     {E, NextEnv} = lists:foldl(fun eval_list_elem/2, {[], Env}, Ast#mal_list.elems),
     {#mal_list{elems=E}, NextEnv};
-eval_ast(Ast, Env) when is_record(Ast, mal_sym) -> {map_get(Ast#mal_sym.val, Env), Env};
+eval_ast(Ast, Env) when is_record(Ast, mal_sym) ->
+    try map_get(Ast#mal_sym.val, Env) of V -> {V, Env}
+    catch
+        _:{badkey, K} -> throw({malerr, io_lib:format("Symbol ~s not in env", [K])})
+    end;
 eval_ast(Ast, Env) -> {Ast, Env}.
