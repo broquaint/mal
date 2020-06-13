@@ -55,7 +55,10 @@ read_atom([Token|Tail]) ->
     if C1 =:= $" ->
             Atom(#mal_str{val=lists:sublist(Token, 2, length(Token) - 2)});
        C1 >= $0, C1 =< $9 -> % Hopefully useful Heuristic,
-            {Num,_} = string:to_integer(Token),
+            Num = element(1, string:to_integer(Token)),
+            Atom(#mal_num{val=Num});
+       C1 =:= $-, length(Token) > 1 -> % TODO Figure out how to fold into num check above.
+            Num = element(1, string:to_integer(Token)),
             Atom(#mal_num{val=Num});
        C1 =:= $: ->
             Atom(#mal_kwd{val=lists:sublist(Token, 2, length(Token) - 1)});
