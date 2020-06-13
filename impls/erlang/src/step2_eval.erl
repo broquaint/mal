@@ -47,11 +47,10 @@ read(Code) ->
 print(Ast) ->
     printer:pr_str(Ast).
 
-eval([], Env) -> {[], Env};
 eval(Ast, Env) when not is_record(Ast, mal_list) -> eval_ast(Ast, Env);
+eval(#mal_list{elems=[]}, Env) -> {#mal_list{elems=[]}, Env};
 eval(Ast, Env) ->
     {#mal_list{elems=[F|Args]}, NextEnv} = eval_ast(Ast, Env),
-%    io:format("> applying ~p with ~p~n", [F, Args]),
     {F(Args), NextEnv}.
 
 eval_list_elem(Ast, {List, Env}) ->
