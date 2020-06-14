@@ -10,5 +10,9 @@
 -record(mal_str, {val}).
 -record(mal_kwd, {val}).
 -record(mal_sym, {val}).
+-record(mal_bool,{val}).
+% -record(mal_nil, {}). just use the atom mal_nil
+
+% -record(mal_fn, {fn}). just use a plain ol' function!
 
 -record(mal_env, {outer, data}).

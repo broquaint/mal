@@ -62,6 +62,12 @@ read_atom([Token|Tail]) ->
             Atom(#mal_num{val=Num});
        C1 =:= $: ->
             Atom(#mal_kwd{val=lists:sublist(Token, 2, length(Token) - 1)});
+       Token == "nil" ->
+            Atom(mal_nil);
+       Token == "true" ->
+            Atom(#mal_bool{val=true});
+       Token == "false" ->
+            Atom(#mal_bool{val=false});
        C1 =:= $' ->
             ReaderMacro("quote");
        C1 =:= $` ->

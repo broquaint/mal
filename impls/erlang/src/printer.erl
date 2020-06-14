@@ -23,5 +23,11 @@ pr_str(Ast) ->
         is_record(Ast, mal_kwd) ->
             ":" ++ Ast#mal_kwd.val;
         is_record(Ast, mal_sym) ->
-            Ast#mal_sym.val
+            Ast#mal_sym.val;
+        Ast =:= mal_nil ->
+            "nil";
+        is_record(Ast, mal_bool) ->
+            io_lib:format("~s", [Ast#mal_bool.val]);
+        is_function(Ast) ->
+            "#<function>"
     end.
