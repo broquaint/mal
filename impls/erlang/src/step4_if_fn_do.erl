@@ -5,17 +5,9 @@
 -export([main/1]).
 
 main(_) ->
-    StrToSym = fun (K, F, Env) -> maps:put(#mal_sym{val=K}, F, Env) end,
-    ReplEnv = env:new(
-                maps:fold(StrToSym, #{},
-                          #{"+" => fun([A,B]) -> num(num(A) + num(B)) end,
-                            "-" => fun([A,B]) -> num(num(A) - num(B)) end,
-                            "*" => fun([A,B]) -> num(num(A) * num(B)) end,
-                            "/" => fun([A,B]) -> num(trunc(num(A) / num(B))) end})),
+    ReplEnv = env:new(core:ns()),
     repl(ReplEnv).
 
-num(#mal_num{val=V}) -> V;
-num(V) when is_integer(V) -> #mal_num{val=V}.
 
 repl(Env) ->
     case io:get_line(standard_io, "user> ") of
