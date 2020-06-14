@@ -65,9 +65,9 @@ read_atom([Token|Tail]) ->
        Token == "nil" ->
             Atom(mal_nil);
        Token == "true" ->
-            Atom(#mal_bool{val=true});
+            Atom(mal_true);
        Token == "false" ->
-            Atom(#mal_bool{val=false});
+            Atom(mal_false);
        C1 =:= $' ->
             ReaderMacro("quote");
        C1 =:= $` ->

@@ -26,8 +26,10 @@ pr_str(Ast) ->
             Ast#mal_sym.val;
         Ast =:= mal_nil ->
             "nil";
-        is_record(Ast, mal_bool) ->
-            io_lib:format("~s", [Ast#mal_bool.val]);
+        Ast =:= mal_true ->
+            "true";
+        Ast =:= mal_false ->
+            "false";
         is_function(Ast) ->
             "#<function>"
     end.

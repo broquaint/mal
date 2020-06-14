@@ -90,7 +90,7 @@ fn_binds(#mal_vec{elems=Params}, Args, Env) ->
 fn_binds([Param|Rest], [Arg|Args], Env) ->
     fn_binds(Rest, Args, env:set(Param, Arg, Env)).
 
-cond_to_res({#mal_bool{val=false}, _}) -> false;
+cond_to_res({V, _}) when V =:= mal_false -> false;
 cond_to_res({V, _}) when V =:= mal_nil -> false;
 cond_to_res(_) -> true.
 
