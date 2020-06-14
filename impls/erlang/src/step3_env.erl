@@ -5,11 +5,13 @@
 -export([main/1]).
 
 main(_) ->
-    ReplEnv = #{"+" => fun([A,B]) -> num(num(A) + num(B)) end,
-                "-" => fun([A,B]) -> num(num(A) - num(B)) end,
-                "*" => fun([A,B]) -> num(num(A) * num(B)) end,
-                "/" => fun([A,B]) -> num(trunc(num(A) / num(B))) end},
-
+    StrToSym = fun (K, F, Env) -> maps:put(#mal_sym{val=K}, F, Env) end,
+    ReplEnv = env:new(
+                maps:fold(StrToSym, #{},
+                          #{"+" => fun([A,B]) -> num(num(A) + num(B)) end,
+                            "-" => fun([A,B]) -> num(num(A) - num(B)) end,
+                            "*" => fun([A,B]) -> num(num(A) * num(B)) end,
+                            "/" => fun([A,B]) -> num(trunc(num(A) / num(B))) end})),
     repl(ReplEnv).
 
 num(#mal_num{val=V}) -> V;
@@ -70,8 +72,5 @@ eval_ast(Ast, Env) when is_record(Ast, mal_map) ->
     {P, NextEnv} = maps:fold(fun eval_map_elem/3, {#{}, Env}, Ast#mal_map.pairs),
     {#mal_map{pairs=P}, NextEnv};
 eval_ast(Ast, Env) when is_record(Ast, mal_sym) ->
-    try map_get(Ast#mal_sym.val, Env) of V -> {V, Env}
-    catch
-        _:{badkey, K} -> throw({malerr, io_lib:format("Symbol ~s not in env", [K])})
-    end;
+    {env:get(Ast, Env), Env};
 eval_ast(Ast, Env) -> {Ast, Env}.

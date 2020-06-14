@@ -10,3 +10,5 @@
 -record(mal_str, {val}).
 -record(mal_kwd, {val}).
 -record(mal_sym, {val}).
+
+-record(mal_env, {outer, data}).
