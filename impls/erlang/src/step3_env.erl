@@ -34,7 +34,7 @@ repl(Env) ->
                     catch
                         _:{malerr, Err} -> io:format("Exception: ~s~n", [Err]),
                                          repl(Env);
-                        _:Reason -> io:format("Runtime error: ~p~n", [Reason]),
+                        _:Reason:Stack -> io:format("Runtime error: ~p~n~p~n", [Reason, Stack]),
                                         repl(Env)
                     end;
                 {error, Err} ->
@@ -51,9 +51,18 @@ print(Ast) ->
 
 eval(Ast, Env) when not is_record(Ast, mal_list) -> eval_ast(Ast, Env);
 eval(#mal_list{elems=[]}, Env) -> {#mal_list{elems=[]}, Env};
-eval(Ast, Env) ->
-    {#mal_list{elems=[F|Args]}, NextEnv} = eval_ast(Ast, Env),
-    {F(Args), NextEnv}.
+eval(AstRec, Env) ->
+    AstList = AstRec#mal_list.elems,
+    [H|Tail] = AstList,
+    % Assuming it's a symbol because otherwise it's an error.
+    case H#mal_sym.val of
+        "def!" -> 
+            [K, E] = Tail,
+            {V, NextEnv} = eval(E, Env),
+            {V, env:set(K, V, NextEnv)};
+        _ -> {#mal_list{elems=[F|Args]}, NextEnv} = eval_ast(AstRec, Env),
+             {F(Args), NextEnv}
+    end.
 
 eval_list_elem(Ast, {List, Env}) ->
     {Res, NextEnv} = eval(Ast, Env),
