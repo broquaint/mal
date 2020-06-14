@@ -60,9 +60,20 @@ eval(AstRec, Env) ->
             [K, E] = Tail,
             {V, NextEnv} = eval(E, Env),
             {V, env:set(K, V, NextEnv)};
+        "let*" ->
+            [Binds, Body] = Tail,
+            {Res, _} = eval(Body, make_binds(Binds, Env)),
+            {Res, Env};
         _ -> {#mal_list{elems=[F|Args]}, NextEnv} = eval_ast(AstRec, Env),
              {F(Args), NextEnv}
     end.
+
+make_binds([], Env) -> Env;
+make_binds(#mal_list{elems=Binds}, Env) -> make_binds(Binds, Env);
+make_binds(#mal_vec{elems=Binds}, Env) -> make_binds(Binds, Env);
+make_binds([Sym, Expr|Tail], Env) ->
+    {Val, NextEnv} = eval(Expr, Env),
+    make_binds(Tail, env:set(Sym, Val, NextEnv)).
 
 eval_list_elem(Ast, {List, Env}) ->
     {Res, NextEnv} = eval(Ast, Env),
