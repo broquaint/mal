@@ -5,7 +5,13 @@
 -export([main/1]).
 
 main(_) ->
-    repl(env:new(core:ns())).
+    Env = env:new(core:ns()),
+    rep("(def! not (fn* (a) (if a false true)))", Env),
+    repl(Env).
+
+rep(Code, Env) ->
+    {success, Ast} = read(Code),
+    print(eval(Ast, Env)).
 
 repl(Env) ->
     case io:get_line(standard_io, "user> ") of
