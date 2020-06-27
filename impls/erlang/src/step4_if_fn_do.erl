@@ -57,7 +57,7 @@ eval(AstRec, Env) ->
             eval(Body, let_binds(Binds, env:new(Env)));
         #mal_sym{val="do"} ->
             Do = fun (Expr, _) -> eval(Expr, Env) end,
-            lists:foldl(Do, eval(H, Env), Tail);
+            lists:foldl(Do, mal_nil, Tail);
         #mal_sym{val="if"} ->
             [Cond, Body|Else] = Tail,
             case cond_to_res(eval(Cond, Env)) of
