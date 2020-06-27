@@ -13,6 +13,6 @@
 -record(mal_bool,{val}).
 % -record(mal_nil, {}). just use the atom mal_nil
 
-% -record(mal_fn, {fn}). just use a plain ol' function!
-
 -record(mal_env, {outer, data}).
+
+-record(mal_fn, {ast, params, env}).

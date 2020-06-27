@@ -5,10 +5,9 @@
 -export([main/1]).
 
 main(_) ->
-    env:start(core:ns()),
-    repl().
+    repl(env:new(core:ns())).
 
-repl() ->
+repl(Env) ->
     case io:get_line(standard_io, "user> ") of
         eof ->
             io:format("~n"),
@@ -19,18 +18,18 @@ repl() ->
         Input ->
             case read(Input) of
                 {success, Ast} ->
-                    try eval(Ast, env:current())
+                    try eval(Ast, Env)
                              of Res -> io:format("~s~n", [print(Res)]),
-                                       repl()
+                                       repl(Env)
                     catch
                         _:{malerr, Err} -> io:format("Exception: ~s~n", [Err]),
-                                         repl();
-                        _:Reason:Stack -> io:format("Mal bug: ~p~n~p~n", [Reason, Stack]),
-                                        repl()
+                                         repl(Env);
+                        E:Reason:Stack -> io:format("Mal bug: ~p~n~p~n~p~n", [E, Reason, Stack]),
+                                        repl(Env)
                     end;
                 {error, Err} ->
                     io:format("Reader error: ~s~n", [Err]),
-                    repl()
+                    repl(Env)
             end
         end.
 
@@ -41,76 +40,72 @@ print(Ast) ->
     printer:pr_str(Ast).
 
 eval(Ast, Env) when not is_record(Ast, mal_list) -> eval_ast(Ast, Env);
-eval(#mal_list{elems=[]}, Env) -> {#mal_list{elems=[]}, Env};
+eval(#mal_list{elems=[]}, _) -> #mal_list{elems=[]};
 eval(AstRec, Env) ->
     AstList = AstRec#mal_list.elems,
     [H|Tail] = AstList,
-%    io:format("ast is: ~p~n", [AstRec]),
+%    io:format("ast is: ~p~n", [printer:pr_str(AstRec)]),
 %    io:format("env is: ~p~n", [Env]),
     case H of
         #mal_sym{val="def!"} ->
             [K, E] = Tail,
-            V = eval(E, Env), % Bug! recursive fail?
-            env:set(K, V),
+            V = eval(E, Env),
+            env:set(K, V, Env),
             V;
         #mal_sym{val="let*"} ->
             [Binds, Body] = Tail,
-            eval(Body, let_binds(Binds, Env));
+            eval(Body, let_binds(Binds, env:new(Env)));
         #mal_sym{val="do"} ->
             Do = fun (Expr, _) -> eval(Expr, Env) end,
             lists:foldl(Do, eval(H, Env), Tail);
         #mal_sym{val="if"} ->
             [Cond, Body|Else] = Tail,
-            case cond_to_res(eval(Cond, Env)) of % Shouldn't need to propagate Env here.
+            case cond_to_res(eval(Cond, Env)) of
                 true  -> eval(Body, Env);
                 false -> if length(Else) > 0 -> eval(hd(Else), Env);
                             true -> mal_nil end
             end;
         #mal_sym{val="fn*"} ->
             [Params, Body] = Tail,
-            Fn = fun(Args) -> 
-                         Binds = fn_binds(Params, Args, Env),
-%                         io:format("binds are: ~p~n", [Binds]),
-                         eval(Body, env:bound(Binds))
-                 end,
-            Fn;
+            #mal_fn{ast=Body, params=Params, env=Env};
         _ ->
             #mal_list{elems=[F|Args]} = eval_ast(AstRec, Env),
-%            io:format("calling ~p with ~p~n", [F, Args]),
-            F(Args)
+            case F of
+                #mal_fn{ast=Body, params=Params, env=CEnv} ->
+                    FnEnv = fn_binds(Params, Args, env:new(CEnv)),
+                    eval(Body, FnEnv);
+                _ ->
+                    F(Args)
+            end
     end.
-
-fn_binds([], _, Env) -> Env;
-fn_binds(#mal_list{elems=Params}, Args, Env) ->
-    fn_binds(Params, Args, Env);
-fn_binds(#mal_vec{elems=Params}, Args, Env) ->
-    fn_binds(Params, Args, Env);
-fn_binds([Param|Rest], [Arg|Args], Env) ->
-    fn_binds(Rest, Args, env:with(Param, Arg, Env)).
-
-cond_to_res(V) when V =:= mal_false -> false;
-cond_to_res(V) when V =:= mal_nil -> false;
-cond_to_res(_) -> true.
 
 let_binds([], Env) -> Env;
 let_binds(#mal_list{elems=Binds}, Env) -> let_binds(Binds, Env);
 let_binds(#mal_vec{elems=Binds}, Env) -> let_binds(Binds, Env);
 let_binds([Sym, Expr|Tail], Env) ->
-    Val = eval(Expr, Env),
-    let_binds(Tail, env:with(Sym, Val, Env)).
+    env:set(Sym, eval(Expr, Env), Env),
+    let_binds(Tail, Env).
 
-eval_list_elem(Ast, {List, Env}) -> {List ++ [eval(Ast, Env)], Env}.
-eval_map_elem(K, Ast, {Pairs, Env}) -> {maps:put(K, eval(Ast, Env), Pairs), Env}.
+fn_binds([], _, Env) -> Env;
+fn_binds(#mal_list{elems=Params}, Args, Env) -> fn_binds(Params, Args, Env);
+fn_binds(#mal_vec{elems=Params}, Args, Env) -> fn_binds(Params, Args, Env);
+fn_binds([Param|Rest], [Arg|Args], Env) ->
+    env:set(Param, Arg, Env),
+    fn_binds(Rest, Args, Env).
 
-eval_ast(Ast, Env) when is_record(Ast, mal_list) ->
-    {Elems, _} = lists:foldl(fun eval_list_elem/2, {[], Env}, Ast#mal_list.elems),
-    #mal_list{elems=Elems};
-eval_ast(Ast, Env) when is_record(Ast, mal_vec) ->
-    {Elems, _} = lists:foldl(fun eval_list_elem/2, {[], Env}, Ast#mal_vec.elems),
-    #mal_vec{elems=Elems};
-eval_ast(Ast, Env) when is_record(Ast, mal_map) ->
-    {Pairs, _} = maps:fold(fun eval_map_elem/3, {#{}, Env}, Ast#mal_map.pairs),
-    #mal_map{pairs=Pairs};
+cond_to_res(V) when V =:= mal_false -> false;
+cond_to_res(V) when V =:= mal_nil -> false;
+cond_to_res(_) -> true.
+
+eval_ast(#mal_list{elems=Elems}, Env) ->
+    Acc = fun(A, L) -> L ++ [eval(A, Env)] end,
+    #mal_list{elems=lists:foldl(Acc, [], Elems)};
+eval_ast(#mal_vec{elems=Elems}, Env) ->
+    Acc = fun(A, L) -> L ++ [eval(A, Env)] end,
+    #mal_vec{elems=lists:foldl(Acc, [], Elems)};
+eval_ast(#mal_map{pairs=Pairs}, Env) ->
+    Acc = fun(K, V, M) -> maps:put(K, eval(V, Env), M) end,
+    #mal_map{pairs=maps:fold(Acc, #{}, Pairs)};
 eval_ast(Ast, Env) when is_record(Ast, mal_sym) ->
     env:get(Ast, Env);
 eval_ast(Ast, _) -> Ast.

@@ -2,7 +2,9 @@
 
 -include("types.hrl").
 
--export([set/2, get/1, get/2, current/0, with/3, bound/1, run/1, start/1]).
+-export([set/3, get/2, for/1, run/1, new/1]).
+
+% Internal helpers with direct access to mal_env records.
 
 e_find(K, Env) when Env#mal_env.outer =:= root ->
     case maps:find(K, Env#mal_env.data) of
@@ -12,7 +14,7 @@ e_find(K, Env) when Env#mal_env.outer =:= root ->
 e_find(K, Env) ->
     case maps:find(K, Env#mal_env.data) of
         {ok, _} -> {ok, Env};
-        error -> e_find(K, Env#mal_env.outer)
+        error -> e_find(K, env:for(Env#mal_env.outer))
     end.
 
 e_get(K, Env) ->
@@ -21,41 +23,38 @@ e_get(K, Env) ->
         error -> {malerr, io_lib:format("Symbol '~s' not found in env", [K#mal_sym.val])}
     end.
 
-with(K, V, Env) ->
-    #mal_env{outer=Env#mal_env.outer, data=maps:put(K, V, Env#mal_env.data)}.
+e_set(K, V, Env) ->
+    Env#mal_env{data=maps:put(K, V, Env#mal_env.data)}.
 
-bound(Env) ->
-    #mal_env{outer=current(), data=Env#mal_env.data}.
+% Module interface for managing a stateful mal_env via a pid.
 
 run(Env) ->
     receive
-        {From, {set, K, V}} ->
-            Res = with(K, V, Env),
-            From ! ok,
-            run(Res);
         {From, {get, K}} ->
 %            io:format("Looking for ~p in ~p~n", [K, Env]),
             From ! e_get(K, Env),
             run(Env);
-        {From, {current}} ->
+        {From, {for}} ->
             From ! {ok, Env},
             run(Env);
+        {From, {set, K, V}} ->
+            Res = e_set(K, V, Env),
+            From ! ok,
+            run(Res);
         E ->
             io:format("env:run fail: [~p]~n", [E]),
             throw(mal_env_err)
     end.
 
-set(K, V) ->
-    Pid = whereis(mal_env),
+set(K, V, Pid) ->
     Pid ! {self(), {set, K, V}},
     receive
-        ok -> ok
+        ok -> set_ok
     after 100 ->
         throw(env_set_timeout)
     end.
 
-get(K) ->
-    Pid = whereis(mal_env),
+get(K, Pid) ->
 %    io:format("Getting ~p in ~p~n", [K, Pid]),
     Pid ! {self(), {get, K}},
     receive
@@ -65,24 +64,18 @@ get(K) ->
         throw(env_get_timeout)
     end.
 
-get(K, Env) ->
-    case e_get(K, Env) of
-        {ok, V} -> V;
-        {malerr, E} -> throw({malerr, E})
-    end.
-
-current() ->
-    Pid = whereis(mal_env),
+for(Pid) ->
 %    io:format("current env is ~p~n", [Pid]),
-    Pid ! {self(), {current}},
+    Pid ! {self(), {for}},
     receive
         {ok, Env} -> Env
     after 100 ->
-        throw(env_current_timeout)
+        throw(env_for_timeout)
     end.
 
-
-% new() -> new(#{}).
-start(M) ->
-    Pid = spawn(?MODULE, run, [#mal_env{outer=root, data=M}]),
-    register(mal_env, Pid).
+new(M) when is_map(M) ->
+    new(root, M);
+new(M) ->
+    new(M, #{}).
+new(Env, M) ->
+    spawn(?MODULE, run, [#mal_env{outer=Env, data=M}]).

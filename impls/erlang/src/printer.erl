@@ -30,6 +30,10 @@ pr_str(Ast) ->
             "true";
         Ast =:= mal_false ->
             "false";
+        is_record(Ast, mal_fn) ->
+            "#<user_function>";
         is_function(Ast) ->
-            "#<function>"
+            "#<core_function>";
+        true ->
+            io_lib:format("WAT ~p", [Ast])
     end.
