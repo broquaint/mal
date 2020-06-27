@@ -89,6 +89,9 @@ let_binds([Sym, Expr|Tail], Env) ->
 fn_binds([], _, Env) -> Env;
 fn_binds(#mal_list{elems=Params}, Args, Env) -> fn_binds(Params, Args, Env);
 fn_binds(#mal_vec{elems=Params}, Args, Env) -> fn_binds(Params, Args, Env);
+fn_binds([#mal_sym{val="&"}, Rest], Args, Env) ->
+    env:set(Rest, #mal_list{elems=Args}, Env),
+    Env;
 fn_binds([Param|Rest], [Arg|Args], Env) ->
     env:set(Param, Arg, Env),
     fn_binds(Rest, Args, Env).
