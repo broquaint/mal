@@ -50,10 +50,10 @@ functions() ->
           end,
       "list" => fun(L) -> #mal_list{elems=L} end,
       "list?" => fun([L]) -> to_bool(is_record(L, mal_list)) end,
-      "empty?" => fun([#mal_list{elems=L}]) -> to_bool(length(L) == 0) end,
+      "empty?" => fun([{_, L}]) -> to_bool(length(L) == 0) end,
       "count" => fun([L]) ->
                          case L of
-                             #mal_list{elems=V} -> num(length(V));
+                             {_, V} -> num(length(V));
                              mal_nil -> num(0)
                          end
                  end,
