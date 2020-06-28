@@ -5,18 +5,13 @@
 -export([read_str/1]).
 
 tokenize(Code) ->
-    MalSyntaxRe = "[\\s,]*(~@|[\\[\\]{}()'`~^@]|\x22(?:\\.|[^\\\x22])*\x22?|;.*|[^\\s\[\\]{}('\x22`,;)]+)",
-    % run(Subject, RE, Options) ->
-    %   {match, Captured} | match | nomatch | {error, ErrType}
+    MalSyntaxRe = "[\\s,]*(~@|[\\[\\]{}()'`~^@]|\x22(?:\x5c\x5c\x22|.*?)*\x22|;.*|[^\\s\[\\]{}('\x22`,;)]+)",
     case re:run(Code, MalSyntaxRe, [global]) of
         {match, Captured} -> 
             Tokens = [lists:sublist(Code, Pos + 1, Len) || [_, {Pos, Len}] <- Captured],
-
             {success, Tokens};
         nomatch -> {error, "Failed to match"}
-        % As this is a global match and a valid RE we shouldn't encounter these.
-        % match | {error, ErrType} -> 
-        end.
+    end.
 
 mal_sym(V) -> #mal_sym{val=V}.
 
@@ -45,6 +40,13 @@ make_map(Map, []) -> Map;
 make_map(Map, [K,V|Rest]) ->
     make_map(maps:put(K, V, Map), Rest).
 
+make_string(RawStr) ->
+    Escapes = [{"\x5c\x22", "\x22"},  % \" -> "
+               {"\x5cn",    "\n"},    % \n -> ␤
+               {"\x5c\x5c", "\x5c"}], % \\ -> \
+    Esc = fun({From, To}, S) -> string:replace(S, From, To, all) end,
+    #mal_str{val=lists:foldl(Esc, RawStr, Escapes)}.
+
 read_atom([Token|Tail]) ->
     [C1|_] = Token,
     ReaderMacro = fun(Sym) ->
@@ -53,7 +55,7 @@ read_atom([Token|Tail]) ->
                   end,
     Atom = fun(A) -> {A, Tail} end,
     if C1 =:= $" ->
-            Atom(#mal_str{val=lists:sublist(Token, 2, length(Token) - 2)});
+            Atom(make_string(lists:sublist(Token, 2, length(Token) - 2)));
        C1 >= $0, C1 =< $9 -> % Hopefully useful Heuristic,
             Num = element(1, string:to_integer(Token)),
             Atom(#mal_num{val=Num});

@@ -20,13 +20,34 @@ int_cmp(F) ->
 num(#mal_num{val=V}) -> V;
 num(V) when is_integer(V) -> #mal_num{val=V}.
 
+str(V) -> #mal_str{val=V}.
+
 % Separate function for indenting sanity.
 functions() ->
     #{
-      "prn" => fun([V]) ->
-                       io:format("~s~n", [printer:pr_str(V)]),
-                       mal_nil
-               end, % TODO support print_readably
+      "dbg" => fun(A) -> str(io_lib:format("~p", A)) end,
+      "pr-str" =>
+          fun(Args) ->
+                  Strs = lists:map(fun(V) -> printer:pr_str(V, true) end, Args),
+                  str(string:join(Strs, " "))
+          end,
+      "str" =>
+          fun(Args) ->
+                  Strs = lists:map(fun(V) -> printer:pr_str(V, false) end, Args),
+                  str(string:join(Strs, ""))
+          end,
+      "prn" =>
+          fun(Args) ->
+                  Strs = lists:map(fun(V) -> printer:pr_str(V, true) end, Args),
+                  io:format("~s~n", [string:join(Strs, " ")]),
+                  mal_nil
+          end,
+      "println" =>
+          fun(Args) ->
+                  Strs = lists:map(fun(V) -> printer:pr_str(V, false) end, Args),
+                  io:format("~s~n", [string:join(Strs, " ")]),
+                  mal_nil
+          end,
       "list" => fun(L) -> #mal_list{elems=L} end,
       "list?" => fun([L]) -> to_bool(is_record(L, mal_list)) end,
       "empty?" => fun([#mal_list{elems=L}]) -> to_bool(length(L) == 0) end,
