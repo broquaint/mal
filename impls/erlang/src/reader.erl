@@ -6,13 +6,10 @@
 
 tokenize(Code) ->
     MalSyntaxRe = "[\\s,]*(~@|[\\[\\]{}()'`~^@]|\x22(?:\x5c\x5c\x22|.*?)*\x22|;.*|[^\\s\[\\]{}('\x22`,;)]+)",
-    case re:run(Code, MalSyntaxRe, [global]) of
-        {match, Captured} -> 
-            Tokens = [lists:sublist(Code, Pos + 1, Len) || [_, {Pos, Len}] <- Captured],
-            {success, Tokens};
+    case re:run(Code, MalSyntaxRe, [dotall, global, {capture, all_but_first, list}]) of
+        {match, Captured} -> {success, lists:append(Captured)};
         nomatch -> {error, "Failed to match"}
     end.
-
 mal_sym(V) -> #mal_sym{val=V}.
 
 % mal_list(E) -> mal_list([E]);

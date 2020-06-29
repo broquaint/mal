@@ -35,10 +35,13 @@ num(V) when is_integer(V) -> #mal_num{val=V}.
 
 str(V) -> #mal_str{val=V}.
 
+die(F, V) -> die(io_lib:format(F, V)).
+die(E) -> throw({malerr, E}).
+
 % Separate function for indenting sanity.
 functions() ->
     #{
-      "dbg" => fun(A) -> str(io_lib:format("~p", A)) end,
+      "dbg" => fun(A) -> io:format("~p~n", A), mal_nil end,
       "pr-str" =>
           fun(Args) ->
                   Strs = lists:map(fun(V) -> printer:pr_str(V, true) end, Args),
@@ -80,7 +83,23 @@ functions() ->
       "+" => fun([A,B]) -> num(num(A) + num(B)) end,
       "-" => fun([A,B]) -> num(num(A) - num(B)) end,
       "*" => fun([A,B]) -> num(num(A) * num(B)) end,
-      "/" => fun([A,B]) -> num(trunc(num(A) / num(B))) end
+      "/" => fun([A,B]) -> num(trunc(num(A) / num(B))) end,
+
+      "read-string" =>
+          fun([#mal_str{val=S}]) ->
+                  case reader:read_str(S) of
+                      {success, Ast} -> Ast;
+                      {error, Err} -> die("Parse fail: ~s", [Err])
+                  end
+          end,
+      "slurp" =>
+          fun([#mal_str{val=F}]) ->
+                  case file:read_file(F) of
+                      {ok, Data} -> str(binary_to_list(Data));
+                      {error, E} ->
+                          die("Couldn't open '~s' for reading: ~p", [F, E])
+                  end
+          end
      }.
 
 ns() ->

@@ -7,6 +7,9 @@
 main(_) ->
     Env = env:new(core:ns()),
     rep("(def! not (fn* (a) (if a false true)))", Env),
+    rep("(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\nnil)\")))))", Env),
+    Eval = fun([Ast]) -> eval(Ast, Env) end,
+    env:set(#mal_sym{val="eval"}, Eval, Env),
     repl(Env).
 
 rep(Code, Env) ->
@@ -24,20 +27,20 @@ repl(Env) ->
         Input ->
             case read(Input) of
                 {success, Ast} ->
-                    try eval(Ast, Env)
-                             of Res -> io:format("~s~n", [print(Res)]),
-                                       repl(Env)
+                    try eval(Ast, Env) of
+                        Res -> io:format("~s~n", [print(Res)]),
+                               repl(Env)
                     catch
                         _:{malerr, Err} -> io:format("Exception: ~s~n", [Err]),
-                                         repl(Env);
-                        E:Reason:Stack -> io:format("Mal bug: ~p~n~p~n~p~n", [E, Reason, Stack]),
-                                        repl(Env)
+                                           repl(Env);
+                        E:Reason:Stack -> io:format("Mal bug: ~p~nReason: ~p~nStack trace: ~p~n", [E, Reason, Stack]),
+                                          repl(Env)
                     end;
                 {error, Err} ->
                     io:format("Reader error: ~s~n", [Err]),
                     repl(Env)
             end
-        end.
+    end.
 
 read(Code) ->
     reader:read_str(Code).
