@@ -46,7 +46,8 @@ make_string(RawStr) ->
     Escapes = [{"\x5c\x22", "\x22"},  % \" -> "
                {"\x5cn",    "\n"},    % \n -> ␤
                {"\x5c\x5c", "\x5c"}], % \\ -> \
-    Esc = fun({From, To}, S) -> string:replace(S, From, To, all) end,
+    Opts = [global, {return, list}],
+    Esc = fun({From, To}, S) -> re:replace(S, From, To, Opts) end,
     #mal_str{val=lists:foldl(Esc, RawStr, Escapes)}.
 
 read_atom([Token|Tail]) ->
