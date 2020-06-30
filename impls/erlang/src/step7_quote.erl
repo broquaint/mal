@@ -9,17 +9,17 @@ main(Args) ->
     rep("(def! not (fn* (a) (if a false true)))", Env),
     rep("(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\nnil)\")))))", Env),
     Eval = fun([Ast]) -> eval(Ast, Env) end,
-    env:set(#mal_sym{val="eval"}, Eval, Env),
+    env:set(sym("eval"), Eval, Env),
 
-    ArgvSym = #mal_sym{val="*ARGV*"},
+    ArgvSym = sym("*ARGV*"),
     if
         length(Args) > 0 ->
             ProgArgs = lists:map(fun(S) -> #mal_str{val=S} end, tl(Args)),
-            env:set(ArgvSym, #mal_list{elems=ProgArgs}, Env),
+            env:set(ArgvSym, list(ProgArgs), Env),
             rep(io_lib:format("(load-file \x22~s\x22)", [hd(Args)]), Env);
         true ->
             Argv = lists:map(fun(S) -> #mal_str{val=S} end, Args),
-            env:set(ArgvSym, #mal_list{elems=Argv}, Env),
+            env:set(ArgvSym, list(Argv), Env),
             repl(Env)
     end.
 
@@ -64,7 +64,7 @@ eval(#mal_list{elems=[]}, _) -> #mal_list{elems=[]};
 eval(AstRec, Env) ->
     AstList = AstRec#mal_list.elems,
     [H|Tail] = AstList,
-%    io:format("ast is: ~p~n", [printer:pr_str(AstRec)]),
+%    io:format("ast is: ~s~n", [printer:pr_str(AstRec)]),
 %    io:format("env is: ~p~n", [Env]),
     case H of
         #mal_sym{val="def!"} ->
@@ -85,6 +85,10 @@ eval(AstRec, Env) ->
                 false -> if length(Else) > 0 -> eval(hd(Else), Env);
                             true -> mal_nil end
             end;
+        #mal_sym{val="quote"} ->
+            hd(Tail);
+        #mal_sym{val="quasiquote"} ->
+            eval(quasiquote(hd(Tail)), Env);
         #mal_sym{val="fn*"} ->
             [Params, Body] = Tail,
             #mal_fn{ast=Body, params=Params, env=Env, eval=fun eval/2};
@@ -98,13 +102,9 @@ eval(AstRec, Env) ->
             end
     end.
 
-cond_to_res(V) when V =:= mal_false -> false;
-cond_to_res(V) when V =:= mal_nil -> false;
-cond_to_res(_) -> true.
-
 eval_ast(#mal_list{elems=Elems}, Env) ->
     Acc = fun(A, L) -> L ++ [eval(A, Env)] end,
-    #mal_list{elems=lists:foldl(Acc, [], Elems)};
+    list(lists:foldl(Acc, [], Elems));
 eval_ast(#mal_vec{elems=Elems}, Env) ->
     Acc = fun(A, L) -> L ++ [eval(A, Env)] end,
     #mal_vec{elems=lists:foldl(Acc, [], Elems)};
@@ -114,3 +114,22 @@ eval_ast(#mal_map{pairs=Pairs}, Env) ->
 eval_ast(Ast, Env) when is_record(Ast, mal_sym) ->
     env:get(Ast, Env);
 eval_ast(Ast, _) -> Ast.
+
+cond_to_res(V) when V =:= mal_false -> false;
+cond_to_res(V) when V =:= mal_nil -> false;
+cond_to_res(_) -> true.
+
+list(L) -> #mal_list{elems=L}.
+
+sym(S) -> #mal_sym{val=S}.
+
+quasiquote({R, [H|T]}) when R == mal_list orelse R == mal_vec -> quasiquote([H|T]);
+quasiquote([H|T]) ->
+    case H of
+        #mal_sym{val="unquote"} -> hd(T);
+        {_, [#mal_sym{val="splice-unquote"}|R]} ->
+            list([sym("concat"), hd(R), quasiquote(T)]);
+        _ -> list([sym("cons"), quasiquote(H), quasiquote(T)])
+    end;
+quasiquote([]) -> list([sym("quote"), list([])]);
+quasiquote(Ast) -> list([sym("quote"), Ast]).
