@@ -29,11 +29,19 @@ is_equal(A, B) ->
 int_cmp(F) ->
     fun([#mal_num{val=A}, #mal_num{val=B}]) -> to_bool(F(A,B)) end.
 
+cons([]) -> [];
+cons([A, {_, L}]) when is_list(L) -> [A] ++ L.
+
+concat([]) -> [];
+concat([{_, L}|Tail]) -> L ++ concat(Tail).
+
 % This is a bit too cute.
 num(#mal_num{val=V}) -> V;
 num(V) when is_integer(V) -> #mal_num{val=V}.
 
 str(V) -> #mal_str{val=V}.
+
+list(L) -> #mal_list{elems=L}.
 
 die(F, V) -> die(io_lib:format(F, V)).
 die(E) -> throw({malerr, E}).
@@ -72,7 +80,7 @@ functions() ->
                   io:format("~s~n", [string:join(Strs, " ")]),
                   mal_nil
           end,
-      "list" => fun(L) -> #mal_list{elems=L} end,
+      "list" => fun(L) -> list(L) end,
       "list?" => fun([L]) -> to_bool(is_record(L, mal_list)) end,
       "empty?" => fun([{_, L}]) -> to_bool(length(L) == 0) end,
       "count" => fun([L]) ->
@@ -112,7 +120,10 @@ functions() ->
       "atom?" => fun([V]) -> to_bool(is_record(V, mal_atom)) end,
       "deref" => fun([#mal_atom{pid=Pid}]) -> atom:deref(Pid) end,
       "reset!" => fun([#mal_atom{pid=Pid}, V]) -> atom:reset(V, Pid), V end,
-      "swap!" => fun([#mal_atom{pid=Pid}, F|Args]) -> atom:swap(F, Args, Pid) end
+      "swap!" => fun([#mal_atom{pid=Pid}, F|Args]) -> atom:swap(F, Args, Pid) end,
+
+      "cons" => fun(L) -> list(cons(L)) end,
+      "concat" => fun(L) -> list(concat(L)) end
      }.
 
 ns() ->
