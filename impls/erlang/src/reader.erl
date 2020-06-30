@@ -4,10 +4,15 @@
 
 -export([read_str/1]).
 
+token_filter(";" ++ _) -> false;
+token_filter(_) -> true.
+
 tokenize(Code) ->
-    MalSyntaxRe = "[\\s,]*(~@|[\\[\\]{}()'`~^@]|\x22(?:\x5c\x5c\x22|.*?)*\x22|;.*|[^\\s\[\\]{}('\x22`,;)]+)",
+    MalSyntaxRe = "[\\s,]*(~@|[\\[\\]{}()'`~^@]|\x22(?:\x5c\x5c\x22|.*?)*\x22|;[^\n]*|[^\\s\[\\]{}('\x22`,;)]+)",
     case re:run(Code, MalSyntaxRe, [dotall, global, {capture, all_but_first, list}]) of
-        {match, Captured} -> {success, lists:append(Captured)};
+        {match, Captured} ->
+            Tokens = lists:filter(fun token_filter/1, lists:append(Captured)),
+            {success, Tokens};
         nomatch -> {error, "Failed to match"}
     end.
 mal_sym(V) -> #mal_sym{val=V}.
