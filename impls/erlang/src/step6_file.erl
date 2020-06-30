@@ -4,13 +4,24 @@
 
 -export([main/1]).
 
-main(_) ->
+main(Args) ->
     Env = env:new(core:ns()),
     rep("(def! not (fn* (a) (if a false true)))", Env),
     rep("(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\nnil)\")))))", Env),
     Eval = fun([Ast]) -> eval(Ast, Env) end,
     env:set(#mal_sym{val="eval"}, Eval, Env),
-    repl(Env).
+
+    ArgvSym = #mal_sym{val="*ARGV*"},
+    if
+        length(Args) > 0 ->
+            ProgArgs = lists:map(fun(S) -> #mal_str{val=S} end, tl(Args)),
+            env:set(ArgvSym, #mal_list{elems=ProgArgs}, Env),
+            rep(io_lib:format("(load-file \x22~s\x22)", [hd(Args)]), Env);
+        true ->
+            Argv = lists:map(fun(S) -> #mal_str{val=S} end, Args),
+            env:set(ArgvSym, #mal_list{elems=Argv}, Env),
+            repl(Env)
+    end.
 
 rep(Code, Env) ->
     {success, Ast} = read(Code),
