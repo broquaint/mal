@@ -63,7 +63,7 @@ eval(AstRec, Env) ->
             V;
         #mal_sym{val="let*"} ->
             [Binds, Body] = Tail,
-            eval(Body, let_binds(Binds, env:new(Env)));
+            eval(Body, env:for_let(Binds, fun eval/2, Env));
         #mal_sym{val="do"} ->
             Do = fun (Expr, _) -> eval(Expr, Env) end,
             lists:foldl(Do, mal_nil, Tail);
@@ -76,34 +76,16 @@ eval(AstRec, Env) ->
             end;
         #mal_sym{val="fn*"} ->
             [Params, Body] = Tail,
-            #mal_fn{ast=Body, params=Params, env=Env};
+            #mal_fn{ast=Body, params=Params, env=Env, eval=fun eval/2};
         _ ->
             #mal_list{elems=[F|Args]} = eval_ast(AstRec, Env),
             case F of
                 #mal_fn{ast=Body, params=Params, env=CEnv} ->
-                    FnEnv = fn_binds(Params, Args, env:new(CEnv)),
-                    eval(Body, FnEnv);
+                    eval(Body, env:for_fn(Params, Args, CEnv));
                 _ ->
                     F(Args)
             end
     end.
-
-let_binds([], Env) -> Env;
-let_binds(#mal_list{elems=Binds}, Env) -> let_binds(Binds, Env);
-let_binds(#mal_vec{elems=Binds}, Env) -> let_binds(Binds, Env);
-let_binds([Sym, Expr|Tail], Env) ->
-    env:set(Sym, eval(Expr, Env), Env),
-    let_binds(Tail, Env).
-
-fn_binds([], _, Env) -> Env;
-fn_binds(#mal_list{elems=Params}, Args, Env) -> fn_binds(Params, Args, Env);
-fn_binds(#mal_vec{elems=Params}, Args, Env) -> fn_binds(Params, Args, Env);
-fn_binds([#mal_sym{val="&"}, Rest], Args, Env) ->
-    env:set(Rest, #mal_list{elems=Args}, Env),
-    Env;
-fn_binds([Param|Rest], [Arg|Args], Env) ->
-    env:set(Param, Arg, Env),
-    fn_binds(Rest, Args, Env).
 
 cond_to_res(V) when V =:= mal_false -> false;
 cond_to_res(V) when V =:= mal_nil -> false;

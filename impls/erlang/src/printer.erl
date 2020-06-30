@@ -31,6 +31,8 @@ pr_str(Ast, R) ->
             "true";
         Ast =:= mal_false ->
             "false";
+        is_record(Ast, mal_atom) ->
+            io_lib:format("(atom ~s)", [pr_str(atom:deref(Ast#mal_atom.pid))]);
         is_record(Ast, mal_fn) ->
             "#<user_function>";
         is_function(Ast) ->

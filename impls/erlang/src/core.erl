@@ -2,7 +2,7 @@
 
 -include("types.hrl").
 
--export([ns/0]).
+-export([call/2, ns/0]).
 
 to_bool(V) when V =:= true -> mal_true;
 to_bool(_) -> mal_false.
@@ -37,6 +37,14 @@ str(V) -> #mal_str{val=V}.
 
 die(F, V) -> die(io_lib:format(F, V)).
 die(E) -> throw({malerr, E}).
+
+call(F, Args) ->
+    case F of
+        #mal_fn{ast=Body, params=Params, env=CEnv, eval=Eval} ->
+            Eval(Body, env:for_fn(Params, Args, CEnv));
+        _ ->
+            F(Args)
+    end.
 
 % Separate function for indenting sanity.
 functions() ->
@@ -99,7 +107,12 @@ functions() ->
                       {error, E} ->
                           die("Couldn't open '~s' for reading: ~p", [F, E])
                   end
-          end
+          end,
+      "atom" => fun([V]) -> #mal_atom{pid=atom:new(V)} end,
+      "atom?" => fun([V]) -> to_bool(is_record(V, mal_atom)) end,
+      "deref" => fun([#mal_atom{pid=Pid}]) -> atom:deref(Pid) end,
+      "reset!" => fun([#mal_atom{pid=Pid}, V]) -> atom:reset(V, Pid), V end,
+      "swap!" => fun([#mal_atom{pid=Pid}, F|Args]) -> atom:swap(F, Args, Pid) end
      }.
 
 ns() ->

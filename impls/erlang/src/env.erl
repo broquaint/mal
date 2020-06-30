@@ -2,7 +2,7 @@
 
 -include("types.hrl").
 
--export([set/3, get/2, for/1, run/1, new/1]).
+-export([for_let/3, for_fn/3, set/3, get/2, for/1, run/1, new/1]).
 
 % Internal helpers with direct access to mal_env records.
 
@@ -25,6 +25,28 @@ e_get(K, Env) ->
 
 e_set(K, V, Env) ->
     Env#mal_env{data=maps:put(K, V, Env#mal_env.data)}.
+
+% Binding helpers
+for_let(Binds, Eval, Env) ->
+    let_binds(Binds, Eval, new(Env)).
+let_binds([], _, Env) -> Env;
+let_binds(#mal_list{elems=Binds}, Eval, Env) -> let_binds(Binds, Eval, Env);
+let_binds(#mal_vec{elems=Binds}, Eval, Env) -> let_binds(Binds, Eval, Env);
+let_binds([Sym, Expr|Tail], Eval, Env) ->
+    env:set(Sym, Eval(Expr, Env), Env),
+    let_binds(Tail, Eval, Env).
+
+for_fn(Params, Args, Env) ->
+    fn_binds(Params, Args, new(Env)).
+fn_binds([], _, Env) -> Env;
+fn_binds(#mal_list{elems=Params}, Args, Env) -> fn_binds(Params, Args, Env);
+fn_binds(#mal_vec{elems=Params}, Args, Env) -> fn_binds(Params, Args, Env);
+fn_binds([#mal_sym{val="&"}, Rest], Args, Env) ->
+    env:set(Rest, #mal_list{elems=Args}, Env),
+    Env;
+fn_binds([Param|Rest], [Arg|Args], Env) ->
+    env:set(Param, Arg, Env),
+    fn_binds(Rest, Args, Env).
 
 % Module interface for managing a stateful mal_env via a pid.
 
