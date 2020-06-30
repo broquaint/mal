@@ -13,11 +13,15 @@ compare_lists([H1|T1], [H2|T2]) ->
     is_equal(H1, H2) and compare_lists(T1, T2).
 
 compare_maps(M1, M2) ->
-    Comp = fun(K, V, Acc) -> Acc and maps:is_key(K, M2) and is_equal(V, maps:get(K, M2)) end,
+    Comp = fun(K, V, Acc) ->
+                   Acc and maps:is_key(K, M2) and is_equal(V, maps:get(K, M2))
+           end,
     maps:fold(Comp, true, M1).
 
 % Make use of the fact that records are just syntax sugar for tuples.
-is_equal({_, V1}, {_, V2}) when is_list(V1) and is_list(V2) ->
+% Can't assert V1/V2 are lists as this would also apply to strings >_<
+is_equal({R1, V1}, {R2, V2})
+  when (R1 == mal_list orelse R1 == mal_vec) and (R2 == mal_list orelse R2 == mal_vec) ->
     length(V1) =:= length(V2) andalso compare_lists(V1, V2);
 is_equal({_, V1}, {_, V2}) when is_map(V1) and is_map(V2) ->
     (maps:size(V1) =:= maps:size(V2)) and compare_maps(V1, V2);
