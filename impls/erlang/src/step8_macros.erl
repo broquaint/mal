@@ -8,6 +8,7 @@ main(Args) ->
     Env = env:new(core:ns()),
     rep("(def! not (fn* (a) (if a false true)))", Env),
     rep("(def! load-file (fn* (f) (eval (read-string (str \"(do \" (slurp f) \"\nnil)\")))))", Env),
+    rep("(defmacro! cond (fn* (& xs) (if (> (count xs) 0) (list 'if (first xs) (if (> (count xs) 1) (nth xs 1) (throw \"odd number of forms to cond\")) (cons 'cond (rest (rest xs)))))))", Env),
     Eval = fun([Ast]) -> eval(Ast, Env) end,
     env:set(sym("eval"), Eval, Env),
 

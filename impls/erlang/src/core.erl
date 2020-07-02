@@ -33,13 +33,24 @@ is_equal(A, B) ->
 int_cmp(F) ->
     fun([#mal_num{val=A}, #mal_num{val=B}]) -> to_bool(F(A,B)) end.
 
+% List support functions for pattern matching goodness.
+
 cons([]) -> [];
-cons([A, {_, L}]) when is_list(L) -> [A] ++ L.
+cons([A, {_, L}]) -> [A] ++ L.
 
 concat([]) -> [];
 concat([{_, L}|Tail]) -> L ++ concat(Tail).
 
-% This is a bit too cute.
+first(mal_nil) -> mal_nil;
+first({_, []}) -> mal_nil;
+first({_, [H|_]}) -> H.
+
+rest(mal_nil) -> [];
+rest({_, []}) -> [];
+rest({_, [_|T]}) -> T.
+
+% Helper functions record construction.
+
 num(#mal_num{val=V}) -> V;
 num(V) when is_integer(V) -> #mal_num{val=V}.
 
@@ -59,6 +70,7 @@ call(F, Args) ->
     end.
 
 % Separate function for indenting sanity.
+
 functions() ->
     #{
       "dbg" => fun(A) -> io:format("~p~n", A), mal_nil end,
@@ -127,7 +139,14 @@ functions() ->
       "swap!" => fun([#mal_atom{pid=Pid}, F|Args]) -> atom:swap(F, Args, Pid) end,
 
       "cons" => fun(L) -> list(cons(L)) end,
-      "concat" => fun(L) -> list(concat(L)) end
+      "concat" => fun(L) -> list(concat(L)) end,
+
+      "nth" => fun([{_, L}, {_, I}]) -> lists:nth(I + 1, L) end,
+      "first" => fun([L]) -> first(L) end,
+      "rest" => fun([L]) -> list(rest(L)) end,
+
+      % Simplify adding new functions i.e no need to worry about trailing comma
+      "identity" => fun([V|_]) -> V end
      }.
 
 ns() ->
