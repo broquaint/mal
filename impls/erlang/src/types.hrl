@@ -15,6 +15,6 @@
 
 -record(mal_env, {outer, data}).
 
--record(mal_fn, {ast, params, env, eval}).
+-record(mal_fn, {ast, params, env, eval, is_macro}).
 
 -record(mal_atom, {pid}).

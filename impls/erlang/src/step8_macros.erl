@@ -59,9 +59,12 @@ read(Code) ->
 print(Ast) ->
     printer:pr_str(Ast).
 
-eval(Ast, Env) when not is_record(Ast, mal_list) -> eval_ast(Ast, Env);
-eval(#mal_list{elems=[]}, _) -> #mal_list{elems=[]};
-eval(AstRec, Env) ->
+eval(Ast, Env) ->
+    subval(macroexpand(Ast, Env), Env).
+subval(Ast, Env) when not is_record(Ast, mal_list) -> eval_ast(Ast, Env);
+subval(#mal_list{elems=[]}, _) -> #mal_list{elems=[]};
+subval(TopAst, Env) ->
+    AstRec = macroexpand(TopAst, Env),
     AstList = AstRec#mal_list.elems,
     [H|Tail] = AstList,
 %    io:format("ast is: ~s~n", [printer:pr_str(AstRec)]),
@@ -72,6 +75,12 @@ eval(AstRec, Env) ->
             V = eval(E, Env),
             env:set(K, V, Env),
             V;
+        #mal_sym{val="defmacro!"} ->
+            [K, E] = Tail,
+            F = eval(E, Env),
+            M = F#mal_fn{is_macro=true},
+            env:set(K, M, Env),
+            M;
         #mal_sym{val="let*"} ->
             [Binds, Body] = Tail,
             eval(Body, env:for_let(Binds, fun eval/2, Env));
@@ -85,6 +94,8 @@ eval(AstRec, Env) ->
                 false -> if length(Else) > 0 -> eval(hd(Else), Env);
                             true -> mal_nil end
             end;
+        #mal_sym{val="macroexpand"} ->
+            macroexpand(hd(Tail), Env);
         #mal_sym{val="quote"} ->
             hd(Tail);
         #mal_sym{val="quasiquote"} ->
@@ -133,3 +144,16 @@ quasiquote([H|T]) ->
     end;
 quasiquote([]) -> list([sym("quote"), list([])]);
 quasiquote(Ast) -> list([sym("quote"), Ast]).
+
+macroexpand(Ast, Env)
+  when is_record(hd(Ast#mal_list.elems), mal_sym) ->
+    #mal_list{elems=[Sym|Args]} = Ast,
+    try env:get(Sym, Env) of
+        #mal_fn{ast=Body, params=Params, env=FnEnv, is_macro=true} ->
+            Next = eval(Body, env:for_fn(Params, Args, FnEnv)),
+            macroexpand(Next, Env);
+        _ -> Ast
+    catch _ -> Ast
+    end;
+
+macroexpand(Ast, _) -> Ast.
