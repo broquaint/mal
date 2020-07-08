@@ -99,12 +99,13 @@ functions() ->
       "list" => fun(L) -> list(L) end,
       "list?" => fun([L]) -> to_bool(is_record(L, mal_list)) end,
       "empty?" => fun([{_, L}]) -> to_bool(length(L) == 0) end,
-      "count" => fun([L]) ->
-                         case L of
-                             {_, V} -> num(length(V));
-                             mal_nil -> num(0)
-                         end
-                 end,
+      "count" =>
+          fun([L]) ->
+                  case L of
+                      {_, V} -> num(length(V));
+                      mal_nil -> num(0)
+                  end
+          end,
       "=" => fun([A,B]) -> to_bool(is_equal(A,B)) end,
 
       "<"  => int_cmp(fun(A,B) -> A < B end),
@@ -141,17 +142,28 @@ functions() ->
       "cons" => fun(L) -> list(cons(L)) end,
       "concat" => fun(L) -> list(concat(L)) end,
 
-      "nth" => fun([{_, L}, {_, I}]) ->
-                       if
-                           I > 0 andalso I =< length(L) -> lists:nth(I + 1, L);
-                           true -> die("index ~c out of bounds", [I])
-
-                       end
-               end,
+      "nth" =>
+          fun([{_, L}, {_, I}]) ->
+                  if
+                      I > 0 andalso I =< length(L) -> lists:nth(I + 1, L);
+                      true -> die("index ~c out of bounds", [I])
+                  end
+          end,
       "first" => fun([L]) -> first(L) end,
       "rest" => fun([L]) -> list(rest(L)) end,
 
       "throw" => fun([M]) -> throw({malerr, M}) end,
+
+      "apply" =>
+          fun([F|A]) ->
+                  {_, L} = lists:last(A),
+                  call(F, lists:droplast(A) ++ L)
+          end,
+      "map" =>
+          fun([F, {_, L}]) ->
+                  Tr = fun(E) -> call(F, [E]) end,
+                  list(lists:map(Tr, L))
+          end,
       % Simplify adding new functions i.e no need to worry about trailing comma
       "identity" => fun([V|_]) -> V end
      }.
