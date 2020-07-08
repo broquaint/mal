@@ -164,6 +164,12 @@ functions() ->
                   Tr = fun(E) -> call(F, [E]) end,
                   list(lists:map(Tr, L))
           end,
+
+      "symbol?" => fun([V]) -> to_bool(is_record(V, mal_sym)) end,
+      "nil?" => fun([V]) -> to_bool(V =:= mal_nil) end,
+      "true?" => fun([V]) -> to_bool(V =:= mal_true) end,
+      "false?" => fun([V]) -> to_bool(V =:= mal_false) end,
+
       % Simplify adding new functions i.e no need to worry about trailing comma
       "identity" => fun([V|_]) -> V end
      }.
