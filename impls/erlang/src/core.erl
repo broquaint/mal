@@ -145,6 +145,7 @@ functions() ->
       "first" => fun([L]) -> first(L) end,
       "rest" => fun([L]) -> list(rest(L)) end,
 
+      "throw" => fun([M]) -> throw({malerr, M}) end,
       % Simplify adding new functions i.e no need to worry about trailing comma
       "identity" => fun([V|_]) -> V end
      }.

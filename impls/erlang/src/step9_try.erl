@@ -24,6 +24,11 @@ main(Args) ->
             repl(Env)
     end.
 
+% When M is a string (aka list) just return otherwise stringify.
+handle_err(M) when is_list(M) -> M;
+handle_err(M) when is_atom(M) -> atom_to_list(M);
+handle_err(M) -> printer:pr_str(M).
+
 rep(Code, Env) ->
     {success, Ast} = read(Code),
     print(eval(Ast, Env)).
@@ -43,7 +48,7 @@ repl(Env) ->
                         Res -> io:format("~s~n", [print(Res)]),
                                repl(Env)
                     catch
-                        _:{malerr, Err} -> io:format("Exception: ~s~n", [Err]),
+                        _:{malerr, Err} -> io:format("Exception: ~s~n", [handle_err(Err)]),
                                            repl(Env);
                         E:Reason:Stack -> io:format("Mal bug: ~p~nReason: ~p~nStack trace: ~p~n", [E, Reason, Stack]),
                                           repl(Env)
@@ -108,7 +113,7 @@ subval(TopAst, Env) ->
                 _:{malerr, Err} ->
                     case CatchAst of
                          [#mal_list{elems=[{_, "catch*"}, Binds, Catch]}] ->
-                            StrErr = #mal_str{val=Err},
+                            StrErr = if is_list(Err) -> #mal_str{val=Err}; true -> Err end,
                             ExEnv = env:for_fn([Binds], [StrErr], Env),
                             eval(Catch, ExEnv);
                         _ -> throw({malerr, Err})
