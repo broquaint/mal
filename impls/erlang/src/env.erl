@@ -20,7 +20,7 @@ e_find(K, Env) ->
 e_get(K, Env) ->
     case e_find(K, Env) of
         {ok, ResEnv} -> {ok, maps:get(K, ResEnv#mal_env.data)};
-        error -> {malerr, io_lib:format("Symbol '~s' not found in env", [K#mal_sym.val])}
+        error -> {malerr, io_lib:format("'~s' not found", [K#mal_sym.val])}
     end.
 
 e_set(K, V, Env) ->
@@ -39,8 +39,7 @@ let_binds([Sym, Expr|Tail], Eval, Env) ->
 for_fn(Params, Args, Env) ->
     fn_binds(Params, Args, new(Env)).
 fn_binds([], _, Env) -> Env;
-fn_binds(#mal_list{elems=Params}, Args, Env) -> fn_binds(Params, Args, Env);
-fn_binds(#mal_vec{elems=Params}, Args, Env) -> fn_binds(Params, Args, Env);
+fn_binds({_, Params}, Args, Env) -> fn_binds(Params, Args, Env);
 fn_binds([#mal_sym{val="&"}, Rest], Args, Env) ->
     env:set(Rest, #mal_list{elems=Args}, Env),
     Env;

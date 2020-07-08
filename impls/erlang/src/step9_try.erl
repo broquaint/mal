@@ -101,6 +101,19 @@ subval(TopAst, Env) ->
             hd(Tail);
         #mal_sym{val="quasiquote"} ->
             eval(quasiquote(hd(Tail)), Env);
+        #mal_sym{val="try*"} ->
+            [Body|CatchAst] = Tail,
+            try eval(Body, Env)
+            catch
+                _:{malerr, Err} ->
+                    case CatchAst of
+                         [#mal_list{elems=[{_, "catch*"}, Binds, Catch]}] ->
+                            StrErr = #mal_str{val=Err},
+                            ExEnv = env:for_fn([Binds], [StrErr], Env),
+                            eval(Catch, ExEnv);
+                        _ -> throw({malerr, Err})
+                    end
+            end;
         #mal_sym{val="fn*"} ->
             [Params, Body] = Tail,
             #mal_fn{ast=Body, params=Params, env=Env, eval=fun eval/2};
