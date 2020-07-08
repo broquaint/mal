@@ -141,7 +141,13 @@ functions() ->
       "cons" => fun(L) -> list(cons(L)) end,
       "concat" => fun(L) -> list(concat(L)) end,
 
-      "nth" => fun([{_, L}, {_, I}]) -> lists:nth(I + 1, L) end,
+      "nth" => fun([{_, L}, {_, I}]) ->
+                       if
+                           I > 0 andalso I =< length(L) -> lists:nth(I + 1, L);
+                           true -> die("index ~c out of bounds", [I])
+
+                       end
+               end,
       "first" => fun([L]) -> first(L) end,
       "rest" => fun([L]) -> list(rest(L)) end,
 
