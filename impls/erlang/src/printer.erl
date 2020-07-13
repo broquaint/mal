@@ -41,16 +41,10 @@ pr_str(Ast, R) ->
             io_lib:format("WAT ~p", [Ast])
     end.
 
-handle_string(Str, R) ->
-    case R of
-        true ->
-            Escapes = [
-                       {"\x5c", "\x5c\x5c"},  % \ -> \\
-                       {"\x22", "\x5c\x22"},  % " -> \"
-                       {"\n",   "\x5cn"}     % ␤ -> \n
-
-                      ],
-            Esc = fun({From, To}, S) -> string:replace(S, From, To, all) end,
-            io_lib:format("\x22~s\x22", [lists:foldl(Esc, Str, Escapes)]);
-        _ -> Str
-    end.
+handle_string(Str, false) -> Str;
+handle_string(Str, true) ->
+    Escapes = #{$\\ => [$\\, $\\ ],   % \ -> \\
+                $"  => [$\\, $"  ],   % " -> \"
+                $\n => [$\\, $\n ]},  % ␤ -> \n
+    UnEsc = fun(C) -> maps:get(C, Escapes, C) end,
+    "\x22" ++  lists:map(UnEsc, Str) ++ "\x22".

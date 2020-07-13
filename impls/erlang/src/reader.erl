@@ -43,9 +43,10 @@ make_map(Map, [K,V|Rest]) ->
     make_map(maps:put(K, V, Map), Rest).
 
 make_string(RawStr) ->
-    Escapes = [{"\x5c\x22", "\x22"},  % \" -> "
-               {"\x5cn",    "\n"},    % \n -> ␤
-               {"\x5c\x5c", "\x5c"}], % \\ -> \
+    % Even the escapes need escaping for the regex to work o_o
+    Escapes = [{"\x5c\x5c\x22",     "\x22"},  % \" -> "
+               {"\x5c\x5cn",        "\n"},    % \n -> ␤
+               {"\x5c\x5c\x5c\x5c", "\x5c"}], % \\ -> \
     Opts = [global, {return, list}],
     Esc = fun({From, To}, S) -> re:replace(S, From, To, Opts) end,
     #mal_str{val=lists:foldl(Esc, RawStr, Escapes)}.
