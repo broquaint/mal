@@ -14,7 +14,7 @@ compare_lists([H1|T1], [H2|T2]) ->
 
 compare_maps(M1, M2) ->
     Comp = fun(K, V, Acc) ->
-                   Acc and maps:is_key(K, M2) and is_equal(V, maps:get(K, M2))
+                   Acc and maps:is_key(K, M2) and is_equal(V, maps:get(K, M2, no_key))
            end,
     maps:fold(Comp, true, M1).
 
@@ -48,6 +48,14 @@ first({_, [H|_]}) -> H.
 rest(mal_nil) -> [];
 rest({_, []}) -> [];
 rest({_, [_|T]}) -> T.
+
+make_map(P) -> make_map(#{}, P).
+make_map(Map, []) -> #mal_map{pairs=Map};
+make_map(Map, [K,V|T]) ->
+    make_map(maps:put(K, V, Map), T).
+
+dissoc(Map, []) -> #mal_map{pairs=Map};
+dissoc(Map, [K|T]) -> dissoc(maps:remove(K, Map), T).
 
 % Helper functions record construction.
 
@@ -145,8 +153,8 @@ functions() ->
       "nth" =>
           fun([{_, L}, {_, I}]) ->
                   if
-                      I > 0 andalso I =< length(L) -> lists:nth(I + 1, L);
-                      true -> die("index ~c out of bounds", [I])
+                      I >= 0 andalso I =< length(L) -> lists:nth(I + 1, L);
+                      true -> die("index ~p out of bounds", [I])
                   end
           end,
       "first" => fun([L]) -> first(L) end,
@@ -166,9 +174,31 @@ functions() ->
           end,
 
       "symbol?" => fun([V]) -> to_bool(is_record(V, mal_sym)) end,
+      "keyword?" => fun([V]) -> to_bool(is_record(V, mal_kwd)) end,
       "nil?" => fun([V]) -> to_bool(V =:= mal_nil) end,
       "true?" => fun([V]) -> to_bool(V =:= mal_true) end,
       "false?" => fun([V]) -> to_bool(V =:= mal_false) end,
+      "vector?" => fun([V]) -> to_bool(is_record(V, mal_vec)) end,
+      "sequential?" => fun([V]) -> to_bool(is_record(V, mal_list) or is_record(V, mal_vec)) end,
+      "map?" => fun([V]) -> to_bool(is_record(V, mal_map)) end,
+
+      "symbol" => fun([{_,S}]) -> #mal_sym{val=S} end,
+      "keyword" => fun([{_,S}]) -> #mal_kwd{val=S} end,
+      "vector" => fun(A) -> #mal_vec{elems=A} end,
+      "hash-map" => fun(P) -> make_map(P) end,
+
+      "assoc" => fun([M|P]) -> make_map(M#mal_map.pairs, P) end,
+      "dissoc" => fun([M|P]) -> dissoc(M#mal_map.pairs, P) end,
+      "contains?" => fun([M, K]) -> to_bool(maps:is_key(K, M#mal_map.pairs)) end,
+      "keys" => fun([M]) -> list(maps:keys(M#mal_map.pairs)) end,
+      "vals" => fun([M]) -> list(maps:values(M#mal_map.pairs)) end,
+      "get" =>
+          fun([M, K]) ->
+                  case M of
+                      mal_nil -> mal_nil;
+                      _ -> maps:get(K, M#mal_map.pairs, mal_nil)
+                  end
+          end,
 
       % Simplify adding new functions i.e no need to worry about trailing comma
       "identity" => fun([V|_]) -> V end
