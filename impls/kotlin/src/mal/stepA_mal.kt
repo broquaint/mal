@@ -70,15 +70,12 @@ fun macroexpand(orig_ast: MalType, env: Env) : MalType {
     return ast
 }
 
-var eval_count = 0
 fun EVAL(cur_ast: MalType, cur_env: Env) : MalType {
     // Allow modification of where in the ast is being evaluated.
     var ast = cur_ast
     // Allow modification of which env is pointed at while evaluating.
     var env = cur_env
     eval_loop@ while (true) {
-        eval_count++
-
         ast = macroexpand(ast, env)
 
         if (ast !is MalList) {
@@ -287,9 +284,6 @@ fun main(args: Array<String>) {
                     }
                 )
                 e.printStackTrace()
-            }
-            finally {
-                eval_count = 0
             }
         }
     }
