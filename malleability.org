@@ -1,0 +1,239 @@
+* On Kotlin's Malleability
+- Or how I learned Kotlin by Making A Lisp
+* Kotlin is like Java but good
+** Give me functions!
+   #+BEGIN_SRC kotlin
+   fun emptyMalList() = MalList(listOf())
+   fun malListOf(vararg elems: MalType) = malListOf(elems.asList())
+   fun malListOf(elems: List<MalType>) = MalList(elems)
+   #+END_SRC
+** Expressions are expressive
+   #+BEGIN_SRC kotlin
+   it.atoms.slice(2 .. (if(it.size > 2) it.size - 1 else 1))
+   #+END_SRC
+   i.e when do you want a statement outside of a declaration?
+** Fewer characters, moar power
+   #+BEGIN_SRC kotlin
+   private fun compare_lists(a: MalSeq, b: MalSeq): Boolean =
+      a.atoms.count() == b.atoms.count() &&
+      a.atoms.indices.all { is_equal(a[it], b[it]) }
+   #+END_SRC
+** Data is more like data
+   #+BEGIN_SRC kotlin
+   data class MalString(val str: String) : MalKey
+   data class MalKeyword(val kw: String) : MalKey
+
+   data class MalAtom(var value : MalType) : MalType
+   #+END_SRC
+* Plays well with JVM
+  Which means it compiles fast and makes Java interop pleasant.
+** What is the JVM but an abstraction over the silicon substrate?
+   #+BEGIN_SRC asm
+; Define variables in the data section
+SECTION .DATA
+	hello:     db 'Hello world!',10
+	helloLen:  equ $-hello
+
+; Code goes in the text section
+SECTION .TEXT
+	GLOBAL _start 
+
+_start:
+	mov eax,4            ; 'write' system call = 4
+	mov ebx,1            ; file descriptor 1 = STDOUT
+	mov ecx,hello        ; string to write
+	mov edx,helloLen     ; length of string to write
+	int 80h              ; call the kernel
+
+	; Terminate program
+	mov eax,1            ; 'exit' system call
+	mov ebx,0            ; exit with error code 0
+	int 80h              ; call the kernel
+   #+END_SRC
+** Look familiar?
+   #+BEGIN_SRC asm
+class Hello {
+  Hello();
+    Code:
+       0: aload_0
+       1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+       4: return
+
+  int main();
+    Code:
+       0: getstatic     #7                  // Field java/lang/System.out:Ljava/io/PrintStream;
+       3: ldc           #13                 // String hello, world!
+       5: invokevirtual #15                 // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+       8: iconst_0
+       9: ireturn
+}
+   #+END_SRC
+** Also it is made of software
+   https://hg.openjdk.java.net/jdk/jdk15/file/b9e3a25945f0
+   #+BEGIN_SRC c++
+   void ClassFileParser::parse_constant_pool_entries(const ClassFileStream* const stream,
+                                                  ConstantPool* cp,
+                                                  const int length,
+                                                  TRAPS) {
+   ...
+   #+END_SRC
+   via [[https://hg.openjdk.java.net/jdk/jdk15/file/b9e3a25945f0/src/hotspot/share/classfile/classFileParser.cpp][src/hotspot/share/classfile/classFileParser.cpp]]
+** Lets do that again but in Kotlin
+   Which is [[https://github.com/JetBrains/kotlin/tree/master/compiler/backend/src/org/jetbrains/kotlin/codegen][_mostly_ self-hosting]]!
+   #+BEGIN_SRC kotlin
+   class TailRecursionCodegen(
+      private val context: MethodContext,
+      private val codegen: ExpressionCodegen,
+      private val v: InstructionAdapter,
+      private val state: GenerationState
+   ) {
+   #+END_SRC
+* Mal in kotlin
+ *Caveat* — This was a learning exercise, shonky code ahead!
+** Features of Kotlin used in Mal …
+***  Safe casting with polymorphic objects (so useful!)
+       #+BEGIN_SRC kotlin
+       when(seq) {
+           is MalList   -> malListOf(rest.reversed() + seq.atoms)
+           else         -> MalVector(seq.atoms + rest)
+       }
+       #+END_SRC
+***  Functions all the things
+       #+BEGIN_SRC kotlin
+       fun READ(s: String) = read_str(s)
+       #+END_SRC
+***  Data classes
+       #+BEGIN_SRC kotlin
+       data class MalNumber(val num: Int) : MalType
+       data class MalSymbol(val sym: String) : MalType
+       data class MalBoolean(val bool: Boolean) : MalType
+       #+END_SRC
+***  When when when
+       #+BEGIN_SRC shell
+       § ag -F 'when(' impls/kotlin/ | wc -l
+       38
+       #+END_SRC
+***  Type inference
+       #+BEGIN_SRC shell
+       § ag 'val \w+ :' impls/kotlin/src/ | wc -l
+        5
+       § ag 'val \w+ =' impls/kotlin/src/ | wc -l
+        177
+       #+END_SRC
+***  Lambdas
+       #+BEGIN_SRC kotlin
+        to_fun("concat") {
+            malListOf(it.atoms.flatMap { (it as MalSeq).atoms })
+        },
+       #+END_SRC
+** Not much code to get going
+   This is only for the self-hosting and dependent files.
+   #+BEGIN_SRC shell
+   § scc impls/kotlin/src/
+────────────────────────────────────────────────────────────────
+Language    Files     Lines   Blanks  Comments   Code Complexity
+────────────────────────────────────────────────────────────────
+Kotlin          7       983       96       100    787        124
+────────────────────────────────────────────────────────────────
+   #+END_SRC
+** Largely immutable
+   Use cases for mutability are few and far between (fortunately)
+   #+BEGIN_SRC shell
+   § ag -i mutable impls/kotlin/
+   impls/kotlin/src/mal/env.kt
+   7:    val data : MutableMap<MalSymbol, MalType> = mutableMapOf()
+   
+   impls/kotlin/src/mal/reader.kt
+   112:    val map : MutableMap<MalKey, MalType> = mutableMapOf()
+   143:    val list : MutableList<MalType> = mutableListOf()
+   #+END_SRC
+* Crash course in Lisp
+  #+BEGIN_SRC clojure
+    (println "the answer is " (+ 40 2))
+
+    (defun factorial [n]
+      (if (= n 0)
+        1
+        (* n (factorial (- n 1)))))
+  #+END_SRC
+  There's a [[https://erkin.party/blog/200715/evolution/][rabbit hole there]] of course.
+** A few things to consider
+   - Parentheses are a thing.
+   - Blame [[https://en.wikipedia.org/wiki/Alonzo_Church][Alonzo Church]] ([[https://en.wikipedia.org/wiki/Lambda_calculus][lambda calculus]] ([[https://en.wikipedia.org/wiki/Foundations_of_mathematics][or Hilbert]]))
+   - One of the first languages ([[https://en.wikipedia.org/wiki/Fortran][Formula Translation]] came first)
+** [[http://www-formal.stanford.edu/jmc/recursive.pdf][Symbols not instructions]]
+     #+BEGIN_QUOTE
+     In the course of its development the LISP system went through
+     several stages of simplification and eventually came to be based
+     on a scheme for representing the partial recursive functions of a
+     certain class of symbolic expressions.
+     #+END_QUOTE
+** [[http://queue.acm.org/detail.cfm?id=1039523][Maxwell's equations of software]]
+   To quote [[https://en.wikipedia.org/wiki/Alan_Kay][Alan Kay]] aka OO pioneer
+   #+BEGIN_QUOTE
+   That was the big revelation to me when I was in graduate
+   school—when I finally understood that the half page of code on the
+   bottom of page 13 of the Lisp 1.5 manual was Lisp in itself. These
+   were “Maxwell’s Equations of Software!” This is the whole world of
+   programming in a few lines that I can put my hand over.
+   #+END_QUOTE
+** Just lists ... sorta
+   Again to quote [[http://www-formal.stanford.edu/jmc/recursive.pdf][that paper]]:
+   #+BEGIN_QUOTE
+   We shall first define a class of symbolic expressions in terms of
+   ordered pairs and lists.
+   #+END_QUOTE
+   Which gets you [[https://en.wikipedia.org/wiki/Homoiconicity][homoiconicity]] … but isn't great for data structures.
+** Cheap macros
+   Look, ma, no preprocessor!
+   #+BEGIN_SRC clojure
+     (defmacro! ->
+       (fn* (x & xs)
+         (reduce _iter-> x xs)))
+
+     (def! _iter->
+       (fn* [acc form]
+         (if (list? form)
+           `(~(first form) ~acc ~@(rest form))
+           (list form acc))))
+
+     ;; Thread initial value into first position of all subsequent calls.
+
+     (-> (list 7 8 9) rest (rest) first (+ 7))
+   #+END_SRC
+* So mal
+  - A gamified way of [[https://github.com/kanaka/mal][Making A Lisp]]
+  - Broken up into multiple steps
+    - ~step0_repl~ Echo program
+    - ~step1_read_print~ Syntax checker
+    - ~step2_eval~ Simple calculator (prefix)
+    - ~step3_env~ Calculator with memory
+    - ~step4_if_fn_do~ Simple Lisp Language
+    - ~step5_tco~ Efficient stack/memory (Tail-calls)
+    - ~step6_file~ File I/O, eval, command line
+    - ~step7_quote~ Code templating (quasiquote)
+    - ~step8_macros~ User defined syntax (macros)
+    - ~step9_try~ Exception handling
+    - ~stepA_mal~ Self-hosting 
+** Starting at step 4
+   A turing–complete language is implemented by step 4:
+   https://github.com/broquaint/mal/blob/kotlin-malleability/impls/kotlin/src/mal/step4_if_fn_do.kt#L1
+   For reference here it is Mal:
+   https://github.com/broquaint/mal/blob/kotlin-malleability/impls/mal/step4_if_fn_do.mal#L4
+** Supporting code
+   - The [[https://github.com/broquaint/mal/blob/kotlin-malleability/impls/kotlin/src/mal/reader.kt#L4][reader]]
+   - The [[https://github.com/broquaint/mal/blob/kotlin-malleability/impls/kotlin/src/mal/printer.kt#L1][printer]]
+   - The [[https://github.com/broquaint/mal/blob/kotlin-malleability/impls/kotlin/src/mal/core.kt#L1][core]]
+   - The [[https://github.com/broquaint/mal/blob/kotlin-malleability/impls/kotlin/src/mal/types.kt#L9][types]]
+** Final product
+   A self-hosting Mal implemented in Kotlin:
+   https://github.com/broquaint/mal/blob/kotlin-malleability/impls/kotlin/src/mal/stepA_mal.kt#L73
+* In conclusion
+** Kotlin can do anything code can do
+   - Not just for aping Java
+   - Will fill most niches quite happily
+** Making a Lisp is easy
+   - If I can do it anyone can
+   - It's a great way to learn a new language!
+** Instructions are for computers, Symbols are for humans
+* FIN
