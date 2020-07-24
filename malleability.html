@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title></title>
+<meta name="author" content="(Daniel Brook)"/>
+<style type="text/css">
+.underline { text-decoration: underline; }
+</style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.css"/>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/theme/moon.css" id="theme"/>
+
+
+<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+<script>
+    if( window.location.search.match( /print-pdf/gi ) ) {
+        var link = document.createElement( 'link' );
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = 'https://cdn.jsdelivr.net/npm/reveal.js/css/print/pdf.css';
+        document.getElementsByTagName( 'head' )[0].appendChild( link );
+    }
+</script>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section>
+<section id="slide-org9e6be53">
+<h2 id="org9e6be53">On Kotlin's Malleability</h2>
+<p>
+Or how I learned to write Kotlin and Make A Lisp
+</p>
+</section>
+</section>
+<section>
+<section id="slide-org7229d57">
+<h2 id="org7229d57">Kotlin is like Java but good</h2>
+<div class="outline-text-2" id="text-org7229d57">
+</div>
+</section>
+<section id="slide-org7b14455">
+<h3 id="org7b14455">Give me functions!</h3>
+<div class="org-src-container">
+
+<pre  class="src src-kotlin"><code trim><span style="color: #66D9EF;">fun</span> <span style="color: #F92672; font-style: italic;">emptyMalList</span>() = <span style="color: #66D9EF;">MalList</span>(listOf())
+<span style="color: #66D9EF;">fun</span> <span style="color: #F92672; font-style: italic;">malListOf</span>(<span style="color: #66D9EF;">vararg</span> elems: <span style="color: #66D9EF;">MalType</span>) = malListOf(elems.asList())
+<span style="color: #66D9EF;">fun</span> <span style="color: #F92672; font-style: italic;">malListOf</span>(elems: <span style="color: #66D9EF;">List&lt;MalType&gt;</span>) = <span style="color: #66D9EF;">MalList</span>(elems)
+</code></pre>
+</div>
+</section>
+<section id="slide-org2c94a87">
+<h3 id="org2c94a87">Expressions are expressive</h3>
+<div class="org-src-container">
+
+<pre  class="src src-kotlin"><code trim><span style="color: #66D9EF;">it</span>.atoms.slice(2 .. (<span style="color: #66D9EF;">if</span>(<span style="color: #66D9EF;">it</span>.size &gt; 2) <span style="color: #66D9EF;">it</span>.size - 1 <span style="color: #66D9EF;">else</span> 1))
+</code></pre>
+</div>
+<p>
+i.e when do you want a statement outside of a declaration?
+</p>
+</section>
+<section id="slide-org2e4acb6">
+<h3 id="org2e4acb6">Fewer characters, moar power</h3>
+<div class="org-src-container">
+
+<pre  class="src src-kotlin"><code trim><span style="color: #66D9EF;">private</span> <span style="color: #66D9EF;">fun</span> <span style="color: #F92672; font-style: italic;">compare_lists</span>(a: <span style="color: #66D9EF;">MalSeq</span>, b: <span style="color: #66D9EF;">MalSeq</span>): <span style="color: #66D9EF;">Boolean</span> =
+   a.atoms.count() == b.atoms.count() &amp;&amp;
+   a.atoms.indices.all { is_equal(a[<span style="color: #66D9EF;">it</span>], b[<span style="color: #66D9EF;">it</span>]) }
+</code></pre>
+</div>
+</section>
+<section id="slide-org47cc5fb">
+<h3 id="org47cc5fb">Data is more like data</h3>
+<div class="org-src-container">
+
+<pre  class="src src-kotlin"><code trim><span style="color: #66D9EF;">data</span> <span style="color: #66D9EF;">class</span> <span style="color: #66D9EF;">MalString</span>(<span style="color: #66D9EF;">val</span> <span style="color: #F92672;">str</span>: <span style="color: #66D9EF;">String</span>) : <span style="color: #66D9EF;">MalKey</span>
+<span style="color: #66D9EF;">data</span> <span style="color: #66D9EF;">class</span> <span style="color: #66D9EF;">MalKeyword</span>(<span style="color: #66D9EF;">val</span> <span style="color: #F92672;">kw</span>: <span style="color: #66D9EF;">String</span>) : <span style="color: #66D9EF;">MalKey</span>
+
+<span style="color: #66D9EF;">data</span> <span style="color: #66D9EF;">class</span> <span style="color: #66D9EF;">MalAtom</span>(<span style="color: #66D9EF;">var</span> <span style="color: #F92672;">value</span> : <span style="color: #66D9EF;">MalType</span>) : <span style="color: #66D9EF;">MalType</span>
+</code></pre>
+</div>
+</section>
+</section>
+<section>
+<section id="slide-orgb9f2650">
+<h2 id="orgb9f2650">Plays well with JVM</h2>
+<p>
+Which means it compiles fast and makes Java interop pleasant.
+</p>
+</section>
+<section id="slide-org63f19f5">
+<h3 id="org63f19f5">What is the JVM but an abstraction over the silicon substrate?</h3>
+<div class="org-src-container">
+
+<pre  class="src src-asm"><code trim><span style="color: #465457; font-style: italic;">; </span><span style="color: #4876ff; font-style: italic;">Define variables in the data section</span>
+<span style="color: #F92672; font-style: italic;">SECTION</span> .DATA
+        <span style="color: #66D9EF;">hello</span>:     db 'Hello world!',10
+        <span style="color: #66D9EF;">helloLen</span>:  equ $-hello
+
+<span style="color: #465457; font-style: italic;">; </span><span style="color: #4876ff; font-style: italic;">Code goes in the text section</span>
+<span style="color: #F92672; font-style: italic;">SECTION</span> .TEXT
+        <span style="color: #66D9EF;">GLOBAL</span> _start 
+
+<span style="color: #F92672; font-style: italic;">_start</span>:
+        <span style="color: #66D9EF;">mov</span> eax,4            <span style="color: #465457; font-style: italic;">; </span><span style="color: #4876ff; font-style: italic;">'write' system call = 4</span>
+        <span style="color: #66D9EF;">mov</span> ebx,1            <span style="color: #465457; font-style: italic;">; </span><span style="color: #4876ff; font-style: italic;">file descriptor 1 = STDOUT</span>
+        <span style="color: #66D9EF;">mov</span> ecx,hello        <span style="color: #465457; font-style: italic;">; </span><span style="color: #4876ff; font-style: italic;">string to write</span>
+        <span style="color: #66D9EF;">mov</span> edx,helloLen     <span style="color: #465457; font-style: italic;">; </span><span style="color: #4876ff; font-style: italic;">length of string to write</span>
+        <span style="color: #66D9EF;">int</span> 80h              <span style="color: #465457; font-style: italic;">; </span><span style="color: #4876ff; font-style: italic;">call the kernel</span>
+
+        <span style="color: #465457; font-style: italic;">; </span><span style="color: #4876ff; font-style: italic;">Terminate program</span>
+        <span style="color: #66D9EF;">mov</span> eax,1            <span style="color: #465457; font-style: italic;">; </span><span style="color: #4876ff; font-style: italic;">'exit' system call</span>
+        <span style="color: #66D9EF;">mov</span> ebx,0            <span style="color: #465457; font-style: italic;">; </span><span style="color: #4876ff; font-style: italic;">exit with error code 0</span>
+        <span style="color: #66D9EF;">int</span> 80h              <span style="color: #465457; font-style: italic;">; </span><span style="color: #4876ff; font-style: italic;">call the kernel</span>
+</code></pre>
+</div>
+</section>
+<section id="slide-org735999a">
+<h3 id="org735999a">Look familiar?</h3>
+<small>
+<div class="org-src-container">
+
+<pre  class="src src-asm"><code trim><span style="color: #F92672; font-style: italic;">class</span> <span style="color: #66D9EF;">Hello</span> {
+  <span style="color: #66D9EF;">Hello</span>()<span style="color: #465457; font-style: italic;">;</span>
+    <span style="color: #66D9EF;">Code</span>:
+       <span style="color: #66D9EF;">0</span>: aload_0
+       <span style="color: #66D9EF;">1</span>: invokespecial #1  <span style="color: #465457; font-style: italic;">// </span><span style="color: #4876ff; font-style: italic;">Method java/lang/Object."&lt;init&gt;":()V</span>
+       <span style="color: #66D9EF;">4</span>: return
+
+  <span style="color: #66D9EF;">int</span> main()<span style="color: #465457; font-style: italic;">;</span>
+    <span style="color: #66D9EF;">Code</span>:
+       <span style="color: #66D9EF;">0</span>: getstatic     #7  <span style="color: #465457; font-style: italic;">// </span><span style="color: #4876ff; font-style: italic;">Field java/lang/System.out:Ljava/io/PrintStream;</span>
+       <span style="color: #66D9EF;">3</span>: ldc           #13 <span style="color: #465457; font-style: italic;">// </span><span style="color: #4876ff; font-style: italic;">String hello, world!</span>
+       <span style="color: #66D9EF;">5</span>: invokevirtual #15 <span style="color: #465457; font-style: italic;">// </span><span style="color: #4876ff; font-style: italic;">Method java/io/PrintStream.println:(Ljava/lang/String;)V</span>
+       <span style="color: #66D9EF;">8</span>: iconst_0
+       <span style="color: #66D9EF;">9</span>: ireturn
+}
+</code></pre>
+</div>
+</small>
+</section>
+<section id="slide-orgeef1f9d">
+<h3 id="orgeef1f9d">Also it is made of software</h3>
+<p>
+<a href="https://hg.openjdk.java.net/jdk/jdk15/file/b9e3a25945f0">https://hg.openjdk.java.net/jdk/jdk15/file/b9e3a25945f0</a>
+</p>
+<small>
+<div class="org-src-container">
+
+<pre  class="src src-c++"><code trim><span style="color: #66D9EF;">void</span> <span style="color: #AE81FF;">ClassFileParser</span>::<span style="color: #F92672; font-style: italic;">parse_constant_pool_entries</span>(<span style="color: #66D9EF;">const</span> <span style="color: #66D9EF;">ClassFileStream</span>* <span style="color: #66D9EF;">const</span> <span style="color: #F92672;">stream</span>,
+                                               <span style="color: #66D9EF;">ConstantPool</span>* <span style="color: #F92672;">cp</span>,
+                                               <span style="color: #66D9EF;">const</span> <span style="color: #66D9EF;">int</span> <span style="color: #F92672;">length</span>,
+                                               TRAPS) {
+...
+</code></pre>
+</div>
+</small>
+<p>
+via <a href="https://hg.openjdk.java.net/jdk/jdk15/file/b9e3a25945f0/src/hotspot/share/classfile/classFileParser.cpp">src/hotspot/share/classfile/classFileParser.cpp</a>
+</p>
+</section>
+<section id="slide-org644bb7b">
+<h3 id="org644bb7b">Lets do that again but in Kotlin</h3>
+<p>
+Which is <a href="https://github.com/JetBrains/kotlin/tree/master/compiler/backend/src/org/jetbrains/kotlin/codegen"><span class="underline">mostly</span> self-hosting</a>!
+</p>
+<div class="org-src-container">
+
+<pre  class="src src-kotlin"><code trim><span style="color: #66D9EF;">class</span> <span style="color: #66D9EF;">TailRecursionCodegen</span>(
+   <span style="color: #66D9EF;">private</span> <span style="color: #66D9EF;">val</span> <span style="color: #F92672;">context</span>: <span style="color: #66D9EF;">MethodContext</span>,
+   <span style="color: #66D9EF;">private</span> <span style="color: #66D9EF;">val</span> <span style="color: #F92672;">codegen</span>: <span style="color: #66D9EF;">ExpressionCodegen</span>,
+   <span style="color: #66D9EF;">private</span> <span style="color: #66D9EF;">val</span> <span style="color: #F92672;">v</span>: <span style="color: #66D9EF;">InstructionAdapter</span>,
+   <span style="color: #66D9EF;">private</span> <span style="color: #66D9EF;">val</span> <span style="color: #F92672;">state</span>: <span style="color: #66D9EF;">GenerationState</span>
+) {
+</code></pre>
+</div>
+</section>
+</section>
+<section>
+<section id="slide-org42dd119">
+<h2 id="org42dd119">Mal in kotlin</h2>
+<p>
+<b>Caveat</b> — This was a learning exercise, shonky code ahead!
+</p>
+</section>
+<section id="slide-orgb834275">
+<h3 id="orgb834275">Features of Kotlin used in Mal …</h3>
+<div class="outline-text-3" id="text-orgb834275">
+</div>
+</section>
+<section id="slide-org5350896">
+<h4 id="org5350896">Safe casting with polymorphic objects (so useful!)</h4>
+<div class="org-src-container">
+
+<pre  class="src src-kotlin"><code trim><span style="color: #66D9EF;">when</span>(seq) {
+    <span style="color: #66D9EF;">is</span> <span style="color: #66D9EF;">MalList</span>   -&gt; malListOf(rest.reversed() + seq.atoms)
+    <span style="color: #66D9EF;">else</span>         -&gt; <span style="color: #66D9EF;">MalVector</span>(seq.atoms + rest)
+}
+</code></pre>
+</div>
+</section>
+<section id="slide-org6392e39">
+<h4 id="org6392e39">Functions all the things</h4>
+<div class="org-src-container">
+
+<pre  class="src src-kotlin"><code trim><span style="color: #66D9EF;">fun</span> <span style="color: #66D9EF;">READ</span>(s: <span style="color: #66D9EF;">String</span>) = read_str(s)
+</code></pre>
+</div>
+</section>
+<section id="slide-orgff34d1c">
+<h4 id="orgff34d1c">Data classes</h4>
+<div class="org-src-container">
+
+<pre  class="src src-kotlin"><code trim><span style="color: #66D9EF;">data</span> <span style="color: #66D9EF;">class</span> <span style="color: #66D9EF;">MalNumber</span>(<span style="color: #66D9EF;">val</span> <span style="color: #F92672;">num</span>: <span style="color: #66D9EF;">Int</span>) : <span style="color: #66D9EF;">MalType</span>
+<span style="color: #66D9EF;">data</span> <span style="color: #66D9EF;">class</span> <span style="color: #66D9EF;">MalSymbol</span>(<span style="color: #66D9EF;">val</span> <span style="color: #F92672;">sym</span>: <span style="color: #66D9EF;">String</span>) : <span style="color: #66D9EF;">MalType</span>
+<span style="color: #66D9EF;">data</span> <span style="color: #66D9EF;">class</span> <span style="color: #66D9EF;">MalBoolean</span>(<span style="color: #66D9EF;">val</span> <span style="color: #F92672;">bool</span>: <span style="color: #66D9EF;">Boolean</span>) : <span style="color: #66D9EF;">MalType</span>
+</code></pre>
+</div>
+</section>
+<section id="slide-org51cd908">
+<h4 id="org51cd908">When when when</h4>
+<div class="org-src-container">
+
+<pre  class="src src-shell"><code trim>&#167; ag -F <span style="color: #E6DB74;">'when('</span> impls/kotlin/ | wc -l
+38
+</code></pre>
+</div>
+</section>
+<section id="slide-orgb462b50">
+<h4 id="orgb462b50">Type inference</h4>
+<div class="org-src-container">
+
+<pre  class="src src-shell"><code trim>&#167; ag <span style="color: #E6DB74;">'val \w+ :'</span> impls/kotlin/src/ | wc -l
+ 5
+&#167; ag <span style="color: #E6DB74;">'val \w+ ='</span> impls/kotlin/src/ | wc -l
+ 177
+</code></pre>
+</div>
+</section>
+<section id="slide-org3459566">
+<h4 id="org3459566">Lambdas</h4>
+<div class="org-src-container">
+
+<pre  class="src src-kotlin"><code trim>to_fun(<span style="color: #E6DB74;">"concat"</span>) {
+    malListOf(<span style="color: #66D9EF;">it</span>.atoms.flatMap { (<span style="color: #66D9EF;">it</span> <span style="color: #66D9EF;">as</span> <span style="color: #66D9EF;">MalSeq</span>).atoms })
+},
+</code></pre>
+</div>
+</section>
+<section id="slide-orga307d12">
+<h3 id="orga307d12">Not much code to get going</h3>
+<p>
+This is only for the self-hosting and dependent files.
+</p>
+<div class="org-src-container">
+
+<pre  class="src src-shell"><code trim>   &#167; scc impls/kotlin/src/
+&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;
+Language    Files     Lines   Blanks  Comments   Code Complexity
+&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;
+Kotlin          7       983       96       100    787        124
+&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;
+</code></pre>
+</div>
+</section>
+<section id="slide-org9723596">
+<h3 id="org9723596">Largely immutable</h3>
+<p>
+Use cases for mutability are few and far between (fortunately)
+</p>
+<div class="org-src-container">
+
+<pre  class="src src-shell"><code trim>&#167; ag -i mutable impls/kotlin/
+impls/kotlin/src/mal/env.kt
+7:    val data : MutableMap&lt;MalSymbol, MalType&gt; = mutableMapOf()
+
+impls/kotlin/src/mal/reader.kt
+112:    val map : MutableMap&lt;MalKey, MalType&gt; = mutableMapOf()
+143:    val list : MutableList&lt;MalType&gt; = mutableListOf()
+</code></pre>
+</div>
+</section>
+</section>
+<section>
+<section id="slide-orge71da98">
+<h2 id="orge71da98">Crash course in Lisp</h2>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><code trim><span style="color: #C4BE89;">(</span>println <span style="color: #E6DB74;">"the answer is "</span> <span style="color: #FD971F;">(</span>+ 40 2<span style="color: #FD971F;">)</span><span style="color: #C4BE89;">)</span>
+
+<span style="color: #C4BE89;">(</span><span style="color: #66D9EF;">defun</span> <span style="color: #F92672; font-style: italic;">factorial</span> <span style="color: #FD971F;">[</span>n<span style="color: #FD971F;">]</span>
+  <span style="color: #FD971F;">(</span><span style="color: #66D9EF;">if</span> <span style="color: #EF5939;">(</span>= n 0<span style="color: #EF5939;">)</span>
+    1
+    <span style="color: #EF5939;">(</span>* n <span style="color: #F92672;">(</span>factorial <span style="color: #960050;">(</span>- n 1<span style="color: #960050;">)</span><span style="color: #F92672;">)</span><span style="color: #EF5939;">)</span><span style="color: #FD971F;">)</span><span style="color: #C4BE89;">)</span>
+</code></pre>
+</div>
+<p>
+There's a <a href="https://erkin.party/blog/200715/evolution/">rabbit hole there</a> of course.
+</p>
+</section>
+<section id="slide-org97159cc">
+<h3 id="org97159cc">A few things to consider</h3>
+<ul>
+<li>Parentheses are a thing.</li>
+<li>Blame <a href="https://en.wikipedia.org/wiki/Alonzo_Church">Alonzo Church</a> (<a href="https://en.wikipedia.org/wiki/Lambda_calculus">lambda calculus</a> (<a href="https://en.wikipedia.org/wiki/Foundations_of_mathematics">or Hilbert</a>))</li>
+<li>One of the first languages (<a href="https://en.wikipedia.org/wiki/Fortran">Formula Translation</a> came first)</li>
+
+</ul>
+</section>
+<section id="slide-org4871053">
+<h3 id="org4871053"><a href="http://www-formal.stanford.edu/jmc/recursive.pdf">Symbols not instructions</a></h3>
+<blockquote >
+<p>
+In the course of its development the LISP system went through
+several stages of simplification and eventually came to be based
+on a scheme for representing the partial recursive functions of a
+certain class of symbolic expressions.
+</p>
+</blockquote>
+</section>
+<section id="slide-org52abf94">
+<h3 id="org52abf94"><a href="http://queue.acm.org/detail.cfm?id=1039523">Maxwell's equations of software</a></h3>
+<p>
+To quote <a href="https://en.wikipedia.org/wiki/Alan_Kay">Alan Kay</a> aka OO pioneer
+</p>
+<blockquote >
+<p>
+That was the big revelation to me when I was in graduate
+school—when I finally understood that the half page of code on the
+bottom of page 13 of the Lisp 1.5 manual was Lisp in itself. These
+were “Maxwell’s Equations of Software!” This is the whole world of
+programming in a few lines that I can put my hand over.
+</p>
+</blockquote>
+</section>
+<section id="slide-orgba6f6d4">
+<h3 id="orgba6f6d4">Just lists &#x2026; sorta</h3>
+<p>
+Again to quote <a href="http://www-formal.stanford.edu/jmc/recursive.pdf">that paper</a>:
+</p>
+<blockquote >
+<p>
+We shall first define a class of symbolic expressions in terms of
+ordered pairs and lists.
+</p>
+</blockquote>
+<p>
+Which gets you <a href="https://en.wikipedia.org/wiki/Homoiconicity">homoiconicity</a> … but isn't great for data structures.
+</p>
+</section>
+<section id="slide-orgca64ea1">
+<h3 id="orgca64ea1">Cheap macros</h3>
+<p>
+Look, ma, no preprocessor!
+</p>
+<div class="org-src-container">
+
+<pre  class="src src-clojure"><code trim><span style="color: #C4BE89;">(</span><span style="color: #66D9EF;">defmacro!</span> <span style="color: #F92672; font-style: italic;">-&gt;</span>
+  <span style="color: #FD971F;">(</span><span style="color: #66D9EF;">fn*</span> <span style="color: #EF5939;">(</span>x &amp; xs<span style="color: #EF5939;">)</span>
+    <span style="color: #EF5939;">(</span>reduce _iter-&gt; x xs<span style="color: #EF5939;">)</span><span style="color: #FD971F;">)</span><span style="color: #C4BE89;">)</span>
+
+<span style="color: #C4BE89;">(</span><span style="color: #66D9EF;">def!</span> <span style="color: #F92672; font-style: italic;">_iter-&gt;</span>
+  <span style="color: #FD971F;">(</span><span style="color: #66D9EF;">fn*</span> <span style="color: #EF5939;">[</span>acc form<span style="color: #EF5939;">]</span>
+    <span style="color: #EF5939;">(</span><span style="color: #66D9EF;">if</span> <span style="color: #F92672;">(</span>list? form<span style="color: #F92672;">)</span>
+      `<span style="color: #F92672;">(</span>~<span style="color: #960050;">(</span>first form<span style="color: #960050;">)</span> ~acc ~@<span style="color: #960050;">(</span>rest form<span style="color: #960050;">)</span><span style="color: #F92672;">)</span>
+      <span style="color: #F92672;">(</span>list form acc<span style="color: #F92672;">)</span><span style="color: #EF5939;">)</span><span style="color: #FD971F;">)</span><span style="color: #C4BE89;">)</span>
+
+<span style="color: #465457; font-style: italic;">;; </span><span style="color: #4876ff; font-style: italic;">Thread initial value into first position of all subsequent calls.</span>
+
+<span style="color: #C4BE89;">(</span><span style="color: #66D9EF;">-&gt;</span> <span style="color: #FD971F;">(</span>list 7 8 9<span style="color: #FD971F;">)</span> rest <span style="color: #FD971F;">(</span>rest<span style="color: #FD971F;">)</span> first <span style="color: #FD971F;">(</span>+ 7<span style="color: #FD971F;">)</span><span style="color: #C4BE89;">)</span>
+</code></pre>
+</div>
+</section>
+</section>
+<section>
+<section id="slide-org709cc92">
+<h2 id="org709cc92">So: mal</h2>
+<p>
+A gamified way of <a href="https://github.com/kanaka/mal">Making A Lisp</a>
+</p>
+<small>
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<tbody>
+<tr>
+<td class="org-left"><code>step0_repl</code></td>
+<td class="org-left">Echo program</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>step1_read_print</code></td>
+<td class="org-left">Syntax checker</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>step2_eval</code></td>
+<td class="org-left">Simple calculator (prefix)</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>step3_env</code></td>
+<td class="org-left">Calculator with memory</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>step4_if_fn_do</code></td>
+<td class="org-left">Simple Lisp Language</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>step5_tco</code></td>
+<td class="org-left">Efficient stack/memory (Tail-calls)</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>step6_file</code></td>
+<td class="org-left">File I/O, eval, command line</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>step7_quote</code></td>
+<td class="org-left">Code templating (quasiquote)</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>step8_macros</code></td>
+<td class="org-left">User defined syntax (macros)</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>step9_try</code></td>
+<td class="org-left">Exception handling</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>stepA_mal</code></td>
+<td class="org-left">Self-hosting</td>
+</tr>
+</tbody>
+</table>
+</small>
+</section>
+<section id="slide-org2911620">
+<h3 id="org2911620">Starting at step 4</h3>
+<p>
+A turing–complete language is implemented by step 4:
+<a href="https://github.com/broquaint/mal/blob/kotlin-malleability/impls/kotlin/src/mal/step4_if_fn_do.kt#L1">https://github.com/broquaint/mal/blob/kotlin-malleability/impls/kotlin/src/mal/step4_if_fn_do.kt#L1</a>
+For reference here it is Mal:
+<a href="https://github.com/broquaint/mal/blob/kotlin-malleability/impls/mal/step4_if_fn_do.mal#L4">https://github.com/broquaint/mal/blob/kotlin-malleability/impls/mal/step4_if_fn_do.mal#L4</a>
+</p>
+</section>
+<section id="slide-orga0aea7e">
+<h3 id="orga0aea7e">Supporting code</h3>
+<ul>
+<li>The <a href="https://github.com/broquaint/mal/blob/kotlin-malleability/impls/kotlin/src/mal/reader.kt#L4">reader</a></li>
+<li>The <a href="https://github.com/broquaint/mal/blob/kotlin-malleability/impls/kotlin/src/mal/printer.kt#L1">printer</a></li>
+<li>The <a href="https://github.com/broquaint/mal/blob/kotlin-malleability/impls/kotlin/src/mal/core.kt#L1">core</a></li>
+<li>The <a href="https://github.com/broquaint/mal/blob/kotlin-malleability/impls/kotlin/src/mal/types.kt#L9">types</a></li>
+
+</ul>
+</section>
+<section id="slide-org0d1a764">
+<h3 id="org0d1a764">Final product</h3>
+<p>
+A self-hosting Mal implemented in Kotlin:
+<a href="https://github.com/broquaint/mal/blob/kotlin-malleability/impls/kotlin/src/mal/stepA_mal.kt#L73">https://github.com/broquaint/mal/blob/kotlin-malleability/impls/kotlin/src/mal/stepA_mal.kt#L73</a>
+</p>
+</section>
+</section>
+<section>
+<section id="slide-org52d9db7">
+<h2 id="org52d9db7">In conclusion</h2>
+<div class="outline-text-2" id="text-org52d9db7">
+</div>
+</section>
+<section id="slide-orgdb5ebed">
+<h3 id="orgdb5ebed">Kotlin can do anything code can do</h3>
+<ul>
+<li>Not just for aping Java</li>
+<li>Will fill most niches quite happily</li>
+
+</ul>
+</section>
+<section id="slide-orgca5f88b">
+<h3 id="orgca5f88b">Making a Lisp is easy</h3>
+<ul>
+<li>If I can do it anyone can</li>
+<li>It's a great way to learn a new language!</li>
+
+</ul>
+</section>
+<section id="slide-org45b1142">
+<h3 id="org45b1142">Instructions are for computers, Symbols are for humans</h3>
+</section>
+</section>
+<section>
+<section id="slide-org527c70b">
+<h2 id="org527c70b">FIN</h2>
+<p>
+Questions?
+</p>
+</section>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js/plugin/markdown/markdown.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js/plugin/zoom/zoom.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js/plugin/notes/notes.js"></script>
+
+
+<script>
+// Full list of configuration options available here:
+// https://github.com/hakimel/reveal.js#configuration
+Reveal.initialize({
+plugins: [RevealMarkdown,RevealZoom,RevealNotes],
+multiplex: {
+    secret: '', // null if client
+    id: '', // id, obtained from socket.io server
+    url: '' // Location of socket.io server
+},
+
+// Optional libraries used to extend on reveal.js
+dependencies: [
+]
+});
+</script>
+</body>
+</html>
