@@ -1,5 +1,6 @@
+#+OPTIONS: num:nil toc:nil reveal_title_slide:nil
 * On Kotlin's Malleability
-- Or how I learned Kotlin by Making A Lisp
+Or how I learned to write Kotlin and Make A Lisp
 * Kotlin is like Java but good
 ** Give me functions!
    #+BEGIN_SRC kotlin
@@ -51,25 +52,28 @@ _start:
 	int 80h              ; call the kernel
    #+END_SRC
 ** Look familiar?
+#+REVEAL_HTML: <small>
    #+BEGIN_SRC asm
 class Hello {
   Hello();
     Code:
        0: aload_0
-       1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+       1: invokespecial #1  // Method java/lang/Object."<init>":()V
        4: return
 
   int main();
     Code:
-       0: getstatic     #7                  // Field java/lang/System.out:Ljava/io/PrintStream;
-       3: ldc           #13                 // String hello, world!
-       5: invokevirtual #15                 // Method java/io/PrintStream.println:(Ljava/lang/String;)V
+       0: getstatic     #7  // Field java/lang/System.out:Ljava/io/PrintStream;
+       3: ldc           #13 // String hello, world!
+       5: invokevirtual #15 // Method java/io/PrintStream.println:(Ljava/lang/String;)V
        8: iconst_0
        9: ireturn
 }
    #+END_SRC
+#+REVEAL_HTML: </small>
 ** Also it is made of software
    https://hg.openjdk.java.net/jdk/jdk15/file/b9e3a25945f0
+   #+REVEAL_HTML: <small>
    #+BEGIN_SRC c++
    void ClassFileParser::parse_constant_pool_entries(const ClassFileStream* const stream,
                                                   ConstantPool* cp,
@@ -77,6 +81,7 @@ class Hello {
                                                   TRAPS) {
    ...
    #+END_SRC
+   #+REVEAL_HTML: </small>
    via [[https://hg.openjdk.java.net/jdk/jdk15/file/b9e3a25945f0/src/hotspot/share/classfile/classFileParser.cpp][src/hotspot/share/classfile/classFileParser.cpp]]
 ** Lets do that again but in Kotlin
    Which is [[https://github.com/JetBrains/kotlin/tree/master/compiler/backend/src/org/jetbrains/kotlin/codegen][_mostly_ self-hosting]]!
@@ -201,20 +206,22 @@ Kotlin          7       983       96       100    787        124
 
      (-> (list 7 8 9) rest (rest) first (+ 7))
    #+END_SRC
-* So mal
-  - A gamified way of [[https://github.com/kanaka/mal][Making A Lisp]]
-  - Broken up into multiple steps
-    - ~step0_repl~ Echo program
-    - ~step1_read_print~ Syntax checker
-    - ~step2_eval~ Simple calculator (prefix)
-    - ~step3_env~ Calculator with memory
-    - ~step4_if_fn_do~ Simple Lisp Language
-    - ~step5_tco~ Efficient stack/memory (Tail-calls)
-    - ~step6_file~ File I/O, eval, command line
-    - ~step7_quote~ Code templating (quasiquote)
-    - ~step8_macros~ User defined syntax (macros)
-    - ~step9_try~ Exception handling
-    - ~stepA_mal~ Self-hosting 
+* So: mal
+A gamified way of [[https://github.com/kanaka/mal][Making A Lisp]]
+#+REVEAL_HTML: <small>
+|--------------------+-------------------------------------|
+| ~step0_repl~       | Echo program                        |
+| ~step1_read_print~ | Syntax checker                      |
+| ~step2_eval~       | Simple calculator (prefix)          |
+| ~step3_env~        | Calculator with memory              |
+| ~step4_if_fn_do~   | Simple Lisp Language                |
+| ~step5_tco~        | Efficient stack/memory (Tail-calls) |
+| ~step6_file~       | File I/O, eval, command line        |
+| ~step7_quote~      | Code templating (quasiquote)        |
+| ~step8_macros~     | User defined syntax (macros)        |
+| ~step9_try~        | Exception handling                  |
+| ~stepA_mal~        | Self-hosting                        |
+#+REVEAL_HTML: </small>
 ** Starting at step 4
    A turing–complete language is implemented by step 4:
    https://github.com/broquaint/mal/blob/kotlin-malleability/impls/kotlin/src/mal/step4_if_fn_do.kt#L1
@@ -237,3 +244,4 @@ Kotlin          7       983       96       100    787        124
    - It's a great way to learn a new language!
 ** Instructions are for computers, Symbols are for humans
 * FIN
+Questions?
