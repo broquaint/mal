@@ -17,6 +17,11 @@ function rep(s: string): string {
 
 let line = prompt('user>')
 while (line !== null) {
-  console.log(rep(line));
-  line = prompt('user>')
+    try {
+        console.log(rep(line));
+    }
+    catch(e) {
+        console.log('Error: ', e)
+    }
+    line = prompt('user>')
 }
