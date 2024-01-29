@@ -3,18 +3,34 @@ export type MalList = {
     values: Array<MalType>
 }
 
-export interface MalAtom {
-    type: string,
-    value: string | number
-}
-
-export type MalSymbol = MalAtom & {
+export type MalSymbol = {
     type: 'symbol'
     value: string
 }
-export type MalNumber = MalAtom & {
+export type MalNumber = {
     type: 'number'
     value: number
 }
+export type MalFuncSig = (...vals: MalType[]) => MalType
+export type MalFunc = {
+    type: 'function',
+    value: MalFuncSig
+}
+export type MalType = MalList | MalNumber | MalSymbol | MalFunc
 
-export type MalType = MalList | MalNumber | MalSymbol
+export type MalEnv = {
+    [index: string]: MalType
+}
+
+// Helper function to take Mal–adjacent values and turn them into proper Mal–typed objects.
+export const mal = {
+    num: function(n: number): MalNumber {
+        return { type: 'number', value: n }
+    },
+    func: function(f: MalFuncSig): MalFunc {
+        return { type: 'function', value: f }
+    },
+    list: function(v: Array<MalType>): MalList {
+        return { type: 'list', values: v }
+    }
+}
