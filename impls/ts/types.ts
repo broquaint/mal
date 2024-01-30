@@ -11,12 +11,23 @@ export type MalNumber = {
     type: 'number'
     value: number
 }
+export type MalString = {
+    type: 'string',
+    value: string
+}
+export type MalBool = {
+    type: 'bool',
+    value: boolean
+}
+export type MalNil = {
+    type: 'nil'
+}
 export type MalFuncSig = (...vals: MalType[]) => MalType
 export type MalFunc = {
     type: 'function',
     value: MalFuncSig
 }
-export type MalType = MalList | MalNumber | MalSymbol | MalFunc
+export type MalType = MalList | MalNumber | MalString | MalBool | MalNil | MalSymbol | MalFunc
 
 export type MalEnv = {
     [index: string]: MalType
@@ -33,4 +44,9 @@ export const mal = {
     list: function(v: Array<MalType>): MalList {
         return { type: 'list', values: v }
     }
+}
+
+// Used for escaping/reading + unescaping/printing
+export interface EscapeMap {
+    readonly [index: string]: string;
 }
