@@ -10,7 +10,7 @@ function malCalc(f: (x: number, y: number) => number): MalFunc {
     })
 }
 
-const env : MalEnv = {
+const env: MalEnv = {
     '+': malCalc((a,b) => a + b),
     '-': malCalc((a,b) => a - b),
     '*': malCalc((a,b) => a * b),
