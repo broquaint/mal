@@ -6,9 +6,9 @@ export type MalVector = {
     type: 'vector',
     values: Array<MalType>
 }
-export type MalMapValue = {
-    [index: string]: MalType
-}
+
+export type MalKey = MalKeyword | MalString
+export type MalMapValue = Map<MalKey, MalType>
 export type MalMap = {
     type: 'map',
     values: MalMapValue

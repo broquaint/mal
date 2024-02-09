@@ -47,11 +47,11 @@ function make_sequence(c: string, list: MalType[]): MalList | MalVector | MalMap
         case '{': {
             if(list.length % 2 !== 0)
                 throw "Encountered map with uneven number of values, aborting"
-            const newMap: MalMapValue = {}
+            const newMap: MalMapValue = new Map()
             for(let i = 0; i < list.length; i += 2) {
                 const [k,v] = list.slice(i, i+2)
                 if(k.type === 'string' || k.type === 'keyword')
-                    newMap[k.value] = v
+                    newMap.set(k, v)
                 else
                     throw `Cannot use "${JSON.stringify(v)}" as map key, aborting`
             }
@@ -75,7 +75,7 @@ function read_atom(r: Reader): MalNumber | MalSymbol | MalString | MalKeyword | 
     else if(v.indexOf('"') === 0)
         return read_string_value(v)
     else if(v.indexOf(':') === 0)
-        return { type: 'keyword', value: '🔑' + v.substring(1) }
+        return { type: 'keyword', value: v.substring(1) }
     else
         return { type: 'symbol', value: v }
 }

@@ -1,4 +1,4 @@
-import { MalNumber, MalList, MalEnv, MalType, mal, MalFunc, MalSymbol, MalVector } from './types.ts'
+import { MalNumber, MalList, MalMap, MalType, mal, MalFunc, MalSymbol } from './types.ts'
 import { read_str } from './reader.ts'
 import { pr_str } from './printer.ts'
 import Env from './env.ts';
@@ -6,7 +6,7 @@ import Env from './env.ts';
 function eval_ast(ast: MalType, env: Env): MalType {
     switch(ast.type) {
         case 'symbol': {
-            return env.get(ast.value)
+            return env.get(ast)
         }
         case 'list':
         case 'vector': {
@@ -17,6 +17,12 @@ function eval_ast(ast: MalType, env: Env): MalType {
                     seed
                 )
             }
+        case 'map': {
+            return Array.from(ast.values.entries()).reduce(
+                (acc: MalMap, [k, v]) => mal.map(acc.values.set(k, EVAL(v, env))),
+                mal.map(new Map())
+            )
+        }
         default:
             return ast
     }
@@ -40,7 +46,7 @@ function EVAL(v: MalType, env: Env): MalType {
             switch(head.value) {
                 case 'def!': {
                     const v = EVAL(tail[1], env)
-                    return env.set((tail[0] as MalSymbol).value, v)
+                    return env.set((tail[0] as MalSymbol), v)
                 }
                 case 'let*': {
                     return EVAL(tail[1], makeEnv((tail[0] as MalList), env))
@@ -67,7 +73,7 @@ function makeEnv(pairs: MalList, outerEnv: Env): Env {
     for(let idx = 0; idx < pairs.values.length; idx += 2) {
         const k = pairs.values[idx] as MalSymbol
         const v = pairs.values[idx + 1]
-        newEnv.set(k.value, EVAL(v, newEnv))
+        newEnv.set(k, EVAL(v, newEnv))
     }
     return newEnv
 }

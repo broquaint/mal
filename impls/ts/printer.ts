@@ -1,4 +1,4 @@
-import { MalType, EscapeMap, MalMapValue } from './types.ts'
+import { MalType, EscapeMap, MalMapValue, MalKey } from './types.ts'
 
 export function pr_str(v: MalType, print_readably = true): string {
     switch(v.type) {
@@ -13,7 +13,6 @@ export function pr_str(v: MalType, print_readably = true): string {
         case 'string':
             return `"${print_readably ? readable_string(v.value): v.value}"`
         case 'keyword':
-            return v.value.replace(/^🔑/, ':')
         case 'symbol':
             return v.value
         case 'bool':
@@ -26,7 +25,6 @@ export function pr_str(v: MalType, print_readably = true): string {
 }
 
 const unescapeMap: EscapeMap = { '\\': '\\\\', "\n": '\\n', '"': '\\"' }
-
 const unescapeRe = /\\|\n|"/g
 
 function readable_string(value: string): string {
@@ -34,13 +32,11 @@ function readable_string(value: string): string {
 }
 
 function readable_map(values: MalMapValue, print_readably: boolean): string {
-    function keyToPrintable(k: string) {
-        return k.indexOf('🔑') === 0 ? k.replace(/^🔑/, ':') : `"${k}"`
+    function keyToPrintable(k: MalKey): string {
+        return ((k.type == 'keyword' ? ':' : '') + k.value)
     }
-    // Need to handle map keys especially as we use regular old strings
-    // to create a map–like object. 
-    return Object.entries(values).reduce(
-        (acc, [k, v]) => acc + keyToPrintable(k) + ' ' + pr_str(v, print_readably),
-        ''
-    )
+    return Array.from(values.entries()).reduce<string[]>(
+        (acc, [k, v]) => acc.concat([keyToPrintable(k), pr_str(v, print_readably)]),
+        []
+    ).join(' ')
 }

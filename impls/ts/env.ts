@@ -1,21 +1,21 @@
-import { MalMapValue, MalType } from "./types.ts";
+import { MalSymbol, MalType } from "./types.ts";
 
 export default class Env {
-    outer: Env | undefined;
-    data: MalMapValue;
+    outer: Env | null;
+    data: { [index: string]: MalType };
 
     constructor(outer?: Env) {
-        this.outer = outer;
+        this.outer = outer ?? null;
         this.data  = {}
     }
 
-    set(k: string, v: MalType): MalType {
-        this.data[k] = v
+    set(k: MalSymbol, v: MalType): MalType {
+        this.data[k.value] = v
         return v
     }
 
-    find(k: string): Env | null {
-        if(k in this.data)
+    find(k: MalSymbol): Env | null {
+        if(k.value in this.data)
             return this
         else
             if(this.outer)
@@ -24,11 +24,12 @@ export default class Env {
                 return null
     }
 
-    get(k: string): MalType {
-        const e = this.find(k);
-        if(e !== null)
-            return e.data[k]
+    get(k: MalSymbol): MalType {
+        const env = this.find(k)
+        if(env !== null)
+            return env.data[k.value]!
         else
-            throw `The symbol '${k}' not found in the environment`
+            // Slightly awkward error phrasing to satisfy tests.
+            throw `The symbol '${k.value}' not found in the environment`
     }
 }
