@@ -61,6 +61,18 @@ export const mal = {
     },
     list: function(v: Array<MalType>): MalList {
         return { type: 'list', values: v }
+    },
+    vector: function(v: Array<MalType>): MalVector {
+        return { type: 'vector', values: v }
+    },
+    map: function(v: MalMapValue): MalMap {
+        return { type: 'map', values: v }
+    },
+    nil: function(): MalNil {
+        return { type: 'nil' }
+    },
+    symbol: function(v: string): MalSymbol {
+        return { type: 'symbol', value: v }
     }
 }
 
