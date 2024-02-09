@@ -8,19 +8,15 @@ function eval_ast(ast: MalType, env: Env): MalType {
         case 'symbol': {
             return env.get(ast.value)
         }
-        case 'list':{
-                return ast.values.reduce(
-                    (a: MalList, b: MalType) => mal.list(a.values.concat([EVAL(b, env)])),
-                    mal.list([])
-                );
-            }
+        case 'list':
         case 'vector': {
+            const valGen = mal[ast.type]
+            const seed = valGen([])
                 return ast.values.reduce(
-                    (a: MalVector, b: MalType) => mal.vector(a.values.concat([EVAL(b, env)])),
-                    mal.vector([])
-                );
+                    (a: typeof seed, b: MalType) => valGen(a.values.concat([EVAL(b, env)])),
+                    seed
+                )
             }
-        
         default:
             return ast
     }

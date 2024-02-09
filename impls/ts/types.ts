@@ -47,6 +47,7 @@ export type MalType = MalList | MalVector | MalMap
           | MalNumber | MalString | MalBool | MalKeyword | MalNil | MalSymbol
           | MalFunc
 
+// Still used by step2_eval, unused otherwise
 export type MalEnv = {
     [index: string]: MalType
 }
