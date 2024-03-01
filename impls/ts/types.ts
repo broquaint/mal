@@ -1,3 +1,5 @@
+import Env from "./env.ts";
+
 export type MalList = {
     type: 'list',
     values: Array<MalType>
@@ -39,13 +41,21 @@ export type MalNil = {
     type: 'nil'
 }
 export type MalFuncSig = (...vals: MalType[]) => MalType
-export type MalFunc = {
+export type MalCoreFunc = {
     type: 'function',
     value: MalFuncSig
 }
+export type MalUserFunc = {
+    type: 'malfunc',
+    ast: MalType,
+    params: MalSeq,
+    env: Env,
+    // name: string
+    // meta: …
+}
 export type MalType = MalList | MalVector | MalMap
           | MalNumber | MalString | MalBool | MalKeyword | MalNil | MalSymbol
-          | MalFunc
+          | MalCoreFunc | MalUserFunc
 
 export type MalSeq = MalList | MalVector
 
@@ -59,7 +69,7 @@ export const mal = {
     number: function(n: number): MalNumber {
         return { type: 'number', value: n }
     },
-    function: function(f: MalFuncSig): MalFunc {
+    function: function(f: MalFuncSig): MalCoreFunc {
         return { type: 'function', value: f }
     },
     list: function(v: Array<MalType>): MalList {
@@ -82,6 +92,9 @@ export const mal = {
     },
     string: function(v: string): MalString {
         return { type: 'string', value: v }
+    },
+    malfunc: function(ast: MalType, params: MalSeq, env: Env): MalUserFunc {
+        return { type: 'malfunc', ast, params, env }
     }
 }
 

@@ -1,7 +1,7 @@
 import { pr_str } from "./printer.ts";
-import { MalFunc, MalMap, MalNumber, MalSeq, MalType, mal } from "./types.ts";
+import { MalCoreFunc, MalMap, MalNumber, MalSeq, MalType, mal } from "./types.ts";
 
-const core : { [index: string]: MalFunc } = {
+const core : { [index: string]: MalCoreFunc } = {
     '+': malCalc((a,b) => a + b),
     '-': malCalc((a,b) => a - b),
     '*': malCalc((a,b) => a * b),
@@ -57,7 +57,7 @@ function isMalSeq(v: MalType): v is MalSeq {
     return v.type === 'list' || v.type === 'vector'
 }
 
-function malCalc(f: (x: number, y: number) => number): MalFunc {
+function malCalc(f: (x: number, y: number) => number): MalCoreFunc {
     return mal.function((a: MalType, b: MalType) => {
         const x = a as MalNumber
         const y = b as MalNumber
@@ -65,7 +65,7 @@ function malCalc(f: (x: number, y: number) => number): MalFunc {
     })
 }
 
-function malComp(f: (x: number, y: number) => boolean): MalFunc {
+function malComp(f: (x: number, y: number) => boolean): MalCoreFunc {
     return mal.function((a: MalType, b: MalType) => {
         const x = a as MalNumber
         const y = b as MalNumber

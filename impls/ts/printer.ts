@@ -20,6 +20,7 @@ export function pr_str(v: MalType, print_readably = true): string {
         case 'nil':
             return 'nil'
         case 'function':
+        case 'malfunc':
             return '#<function>'
         default:
             throw "Unrecognised value type " + JSON.stringify(v)

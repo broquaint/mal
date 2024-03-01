@@ -1,4 +1,4 @@
-import { MalList, MalMap, MalType, mal, MalFunc, MalSymbol, MalSeq } from './types.ts'
+import { MalList, MalMap, MalType, mal, MalCoreFunc, MalSymbol, MalSeq } from './types.ts'
 import { read_str } from './reader.ts'
 import { pr_str } from './printer.ts'
 import Env from './env.ts';
@@ -79,7 +79,7 @@ function EVAL(v: MalType, env: Env): MalType {
         }
 
         const callSite = eval_ast(v, env) as MalList
-        const f        = callSite.values[0] as MalFunc
+        const f        = callSite.values[0] as MalCoreFunc
         const args     = callSite.values.slice(1)
 
         return f.value.apply(null, args)
