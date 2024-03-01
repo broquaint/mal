@@ -1,4 +1,4 @@
-import { MalSymbol, MalType, MalSeq } from "./types.ts";
+import { MalSymbol, MalType, MalSeq, mal } from "./types.ts";
 
 export default class Env {
     outer: Env | null;
@@ -8,10 +8,17 @@ export default class Env {
         this.outer = outer ?? null;
         this.data  = {}
         if(binds && exprs) {
-            binds.values.forEach((v, idx) => {
-                const sym = v as MalSymbol
-                this.set(sym, exprs.values[idx])
-            })
+            for(let idx = 0; idx < binds.values.length; idx++) {
+                const sym = binds.values[idx] as MalSymbol
+                if(sym.value === '&') {
+                    const lastBind = binds.values[idx + 1] as MalSymbol
+                    this.set(lastBind, mal.list(exprs.values.slice(idx)))
+                    break;
+                }
+                else {
+                    this.set(sym, exprs.values[idx])
+                }
+            }
         }
     }
 

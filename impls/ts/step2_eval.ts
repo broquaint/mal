@@ -3,10 +3,10 @@ import { read_str } from './reader.ts'
 import { pr_str } from './printer.ts'
 
 function malCalc(f: (x: number, y: number) => number): MalFunc {
-    return mal.func((a: MalType, b: MalType) => {
+    return mal.function((a: MalType, b: MalType) => {
         const x = a as MalNumber
         const y = b as MalNumber
-        return mal.num(f(x.value, y.value))
+        return mal.number(f(x.value, y.value))
     })
 }
 

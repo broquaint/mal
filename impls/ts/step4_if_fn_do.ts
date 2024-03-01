@@ -71,7 +71,7 @@ function EVAL(v: MalType, env: Env): MalType {
                 case 'fn*': {
                     const binds = tail[0] as MalSeq
                     const body  = tail[1]
-                    return mal.func((...vals: MalType[]) => {
+                    return mal.function((...vals: MalType[]) => {
                         return EVAL(body, new Env(env, binds, mal.list(vals)))
                     })
                 }
@@ -110,6 +110,8 @@ const env = new Env()
 Object.entries(core).forEach(([s, f]) => {
     env.set(mal.symbol(s), f)
 })
+
+rep("(def! not (fn* (a) (if a false true)))")
 
 let line = prompt('user>')
 while (line !== null) {

@@ -56,10 +56,10 @@ export type MalEnv = {
 
 // Helper function to take Mal–adjacent values and turn them into proper Mal–typed objects.
 export const mal = {
-    num: function(n: number): MalNumber {
+    number: function(n: number): MalNumber {
         return { type: 'number', value: n }
     },
-    func: function(f: MalFuncSig): MalFunc {
+    function: function(f: MalFuncSig): MalFunc {
         return { type: 'function', value: f }
     },
     list: function(v: Array<MalType>): MalList {
@@ -77,9 +77,12 @@ export const mal = {
     symbol: function(v: string): MalSymbol {
         return { type: 'symbol', value: v }
     },
-    'bool': function(v: boolean): MalBool {
+    bool: function(v: boolean): MalBool {
         return { type: 'bool', value: v }
     },
+    string: function(v: string): MalString {
+        return { type: 'string', value: v }
+    }
 }
 
 // Used for escaping/reading + unescaping/printing

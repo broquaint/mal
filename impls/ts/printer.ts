@@ -11,7 +11,7 @@ export function pr_str(v: MalType, print_readably = true): string {
         case 'number':
             return String(v.value)
         case 'string':
-            return `"${print_readably ? readable_string(v.value): v.value}"`
+            return print_readably ? `"${readable_string(v.value)}"`: v.value
         case 'keyword':
         case 'symbol':
             return v.value
