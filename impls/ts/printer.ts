@@ -19,8 +19,10 @@ export function pr_str(v: MalType, print_readably = true): string {
             return String(v.value)
         case 'nil':
             return 'nil'
+        case 'function':
+            return '#<function>'
         default:
-            throw "Unrecognised value type " + v
+            throw "Unrecognised value type " + JSON.stringify(v)
     }
 }
 

@@ -47,6 +47,8 @@ export type MalType = MalList | MalVector | MalMap
           | MalNumber | MalString | MalBool | MalKeyword | MalNil | MalSymbol
           | MalFunc
 
+export type MalSeq = MalList | MalVector
+
 // Still used by step2_eval, unused otherwise
 export type MalEnv = {
     [index: string]: MalType
@@ -74,7 +76,10 @@ export const mal = {
     },
     symbol: function(v: string): MalSymbol {
         return { type: 'symbol', value: v }
-    }
+    },
+    'bool': function(v: boolean): MalBool {
+        return { type: 'bool', value: v }
+    },
 }
 
 // Used for escaping/reading + unescaping/printing

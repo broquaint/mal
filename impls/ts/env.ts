@@ -1,12 +1,18 @@
-import { MalSymbol, MalType } from "./types.ts";
+import { MalSymbol, MalType, MalSeq } from "./types.ts";
 
 export default class Env {
     outer: Env | null;
     data: { [index: string]: MalType };
 
-    constructor(outer?: Env) {
+    constructor(outer?: Env, binds?: MalSeq, exprs?: MalSeq) {
         this.outer = outer ?? null;
         this.data  = {}
+        if(binds && exprs) {
+            binds.values.forEach((v, idx) => {
+                const sym = v as MalSymbol
+                this.set(sym, exprs.values[idx])
+            })
+        }
     }
 
     set(k: MalSymbol, v: MalType): MalType {
